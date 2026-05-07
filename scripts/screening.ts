@@ -74,15 +74,51 @@ function sleep(ms: number): Promise<void> {
 // ============================================
 
 class JQuantsClient {
-  private apiKey: string;
+  private email: string;
+  private password: string;
   private baseUrl: string;
+  private idToken: string | null = null;
 
-  constructor(apiKey: string, baseUrl: string = 'https://api.jquants.com/v1') {
-    this.apiKey = apiKey;
+  constructor(email: string, password: string, baseUrl: string = 'https://api.jquants.com/v1') {
+    this.email = email;
+    this.password = password;
     this.baseUrl = baseUrl;
   }
 
+  private async getIdToken(): Promise<string> {
+    if (this.idToken) return this.idToken;
+
+    const authRes = await fetch(`${this.baseUrl}/token/auth_user`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mailaddress: this.email, password: this.password }),
+    });
+
+    if (!authRes.ok) {
+      const text = await authRes.text().catch(() => '');
+      throw new Error(`J-Quants auth_user failed: ${authRes.status} ${text}`);
+    }
+
+    const authData = await authRes.json() as { refreshToken: string };
+
+    const refreshRes = await fetch(`${this.baseUrl}/token/auth_refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: authData.refreshToken }),
+    });
+
+    if (!refreshRes.ok) {
+      const text = await refreshRes.text().catch(() => '');
+      throw new Error(`J-Quants auth_refresh failed: ${refreshRes.status} ${text}`);
+    }
+
+    const refreshData = await refreshRes.json() as { idToken: string };
+    this.idToken = refreshData.idToken;
+    return this.idToken;
+  }
+
   private async fetchJson<T>(path: string): Promise<T> {
+    const token = await this.getIdToken();
     const url = `${this.baseUrl}${path}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -91,7 +127,7 @@ class JQuantsClient {
         signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': this.apiKey,
+          Authorization: `Bearer ${token}`,
         },
       });
       clearTimeout(timeoutId);
@@ -369,15 +405,16 @@ ${docText.slice(0, 8000)}
 // ============================================
 
 async function runScreening(): Promise<PickResult[]> {
-  const jquantsApiKey = process.env.JQUANTS_API_KEY;
+  const jquantsEmail = process.env.JQUANTS_EMAIL;
+  const jquantsPassword = process.env.JQUANTS_PASSWORD;
   const edinetSubscriptionKey = process.env.EDINET_SUBSCRIPTION_KEY;
   const openrouterApiKey = process.env.OPENROUTER_API_KEY;
 
-  if (!jquantsApiKey || !edinetSubscriptionKey || !openrouterApiKey) {
+  if (!jquantsEmail || !jquantsPassword || !edinetSubscriptionKey || !openrouterApiKey) {
     throw new Error('Missing required environment variables');
   }
 
-  const jquants = new JQuantsClient(jquantsApiKey);
+  const jquants = new JQuantsClient(jquantsEmail, jquantsPassword);
   const yahoo = new YahooFinanceClient();
   const edinet = new EdinetClient(edinetSubscriptionKey);
   const openrouter = new OpenRouterClient(openrouterApiKey);
