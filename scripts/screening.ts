@@ -138,6 +138,16 @@ class JQuantsClient {
 // Yahoo Finance クライアント
 // ============================================
 
+interface YahooChartResponse {
+  chart: {
+    result: Array<{
+      indicators: {
+        quote: Array<{ close: number[] }>;
+      };
+    }>;
+  };
+}
+
 class YahooFinanceClient {
   private async fetchJson<T>(url: string): Promise<T> {
     const res = await fetch(url, {
@@ -158,7 +168,7 @@ class YahooFinanceClient {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`;
     
     try {
-      const data = await this.fetchJson<{ chart: { result: Array<{ indicators: { quote: Array<{ close: number[] }> }> }> }>(url);
+      const data = await this.fetchJson<YahooChartResponse>(url);
       const result = data.chart?.result?.[0];
       const quote = result?.indicators?.quote?.[0];
       const close = quote?.close?.[0];
@@ -172,7 +182,7 @@ class YahooFinanceClient {
   async fetchTopix(): Promise<number | null> {
     const url = 'https://query1.finance.yahoo.com/v8/finance/chart/^N225?interval=1d&range=1d';
     try {
-      const data = await this.fetchJson<{ chart: { result: Array<{ indicators: { quote: Array<{ close: number[] }> }> }> }>(url);
+      const data = await this.fetchJson<YahooChartResponse>(url);
       const result = data.chart?.result?.[0];
       const quote = result?.indicators?.quote?.[0];
       return quote?.close?.[0] ?? null;
