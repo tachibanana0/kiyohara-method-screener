@@ -391,8 +391,18 @@ async function runScreening(): Promise<PickResult[]> {
   });
   console.log(`Target: ${targetSymbols.length} TSE Growth stocks`);
 
+  // バッチ処理: 1日50銘柄ずつ、6日で全銘柄カバー
+  const BATCH_SIZE = 50;
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
+  const batchIndex = (dayOfWeek - 1 + 5) % 5; // 0-4 for Mon-Fri
+  const startIdx = batchIndex * BATCH_SIZE;
+  const endIdx = Math.min(startIdx + BATCH_SIZE, targetSymbols.length);
+  const batchSymbols = targetSymbols.slice(startIdx, endIdx);
+  console.log(`Batch ${batchIndex + 1}/5: processing stocks ${startIdx + 1}-${endIdx} of ${targetSymbols.length}`);
+
   console.log('Step 2: Yahoo Financeで株価取得');
-  const codes = targetSymbols.map((s) => s.Code);
+  const codes = batchSymbols.map((s) => s.Code);
   const priceMap = await yahoo.fetchQuotes(codes);
   console.log(`Fetched Yahoo prices for ${priceMap.size} stocks`);
 
@@ -403,7 +413,7 @@ async function runScreening(): Promise<PickResult[]> {
   console.log('Step 4: 財務データ取得 & スクリーニング');
   const screened: QuantScreenedStock[] = [];
 
-  for (const sym of targetSymbols) {
+  for (const sym of batchSymbols) {
     const priceData = priceMap.get(sym.Code);
     if (!priceData) {
       console.log(`Skip ${sym.Code}: no price data`);
@@ -411,7 +421,7 @@ async function runScreening(): Promise<PickResult[]> {
     }
 
     try {
-      await sleep(5000);
+      await sleep(20000);
       let statements = await jquants.fetchStatements(sym.Code);
 
       if (statements.length === 0) {
