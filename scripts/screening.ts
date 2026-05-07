@@ -86,10 +86,8 @@ class JQuantsClient {
   private async getAuthToken(): Promise<string> {
     if (this.authToken) return this.authToken;
 
-    const res = await fetch('https://api.jquants.com/v1/auth', {
+    const res = await fetch(`https://api.jquants.com/v1/auth?apikey=${this.apiKey}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apikey: this.apiKey }),
     });
 
     if (!res.ok) {
