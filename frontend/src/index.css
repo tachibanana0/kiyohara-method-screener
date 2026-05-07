@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #1e3a5f;
+  --color-accent: #d4af37;
+  --color-surface: #f8fafc;
+  --color-danger: #dc2626;
+  --color-success: #16a34a;
+}
+
+body {
+  font-family: 'Noto Sans JP', ui-sans-serif, system-ui, sans-serif;
+  background-color: var(--color-surface);
+}

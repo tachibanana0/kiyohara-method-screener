@@ -1,0 +1,25 @@
+{
+  "name": "kiyohara-method-screener",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --persist-to=./.wrangler/state",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types",
+    "db:migrate:local": "wrangler d1 migrations apply kiyohara-screener-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply kiyohara-screener-db --remote",
+    "db:export": "wrangler d1 export kiyohara-screener-db --remote --output=./backup.sql",
+    "screening": "tsx scripts/screening.ts",
+    "tracking": "tsx scripts/tracking.ts"
+  },
+  "dependencies": {
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250506.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.6.0",
+    "wrangler": "^4.0.0"
+  }
+}

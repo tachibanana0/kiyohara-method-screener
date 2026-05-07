@@ -1,0 +1,24 @@
+{
+  "name": "kiyohara-method-screener",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-06",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "kiyohara-screener-db",
+      "database_id": "77eb7bd9-835a-489e-b854-a2beff1f5491",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "APP_URL": "https://kiyohara-screener.hikakunavi360.com",
+    "JQUANTS_API_BASE": "https://api.jquants.com/v2",
+    "EDINET_API_BASE": "https://disclosure.edinet-fsa.go.jp/api/v2",
+    "OPENROUTER_API_BASE": "https://openrouter.ai/api/v1"
+  }
+}
