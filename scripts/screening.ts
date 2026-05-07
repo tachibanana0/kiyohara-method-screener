@@ -76,33 +76,13 @@ function sleep(ms: number): Promise<void> {
 class JQuantsClient {
   private apiKey: string;
   private baseUrl: string;
-  private authToken: string | null = null;
 
-  constructor(apiKey: string, baseUrl: string = 'https://api.jquants.com/v2') {
+  constructor(apiKey: string, baseUrl: string = 'https://api.jquants.com/v1') {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl;
   }
 
-  private async getAuthToken(): Promise<string> {
-    if (this.authToken) return this.authToken;
-
-    const res = await fetch(`${this.baseUrl}/auth`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apikey: this.apiKey }),
-    });
-
-    if (!res.ok) {
-      throw new Error(`J-Quants auth failed: ${res.status}`);
-    }
-
-    const data = await res.json() as { refreshToken: string };
-    this.authToken = data.refreshToken;
-    return this.authToken;
-  }
-
   private async fetchJson<T>(path: string): Promise<T> {
-    const token = await this.getAuthToken();
     const url = `${this.baseUrl}${path}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -111,7 +91,7 @@ class JQuantsClient {
         signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          'x-api-key': this.apiKey,
         },
       });
       clearTimeout(timeoutId);
