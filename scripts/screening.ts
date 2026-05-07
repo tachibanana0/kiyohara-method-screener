@@ -264,8 +264,6 @@ class EdinetClient {
   async fetchDocumentText(docId: string): Promise<string> {
     const url = `${this.baseUrl}/documents/${docId}`;
     
-    // EDINET returns XBRL documents with redirects
-    // Node.js fetch has redirect limits, so we handle manually
     let currentUrl = url;
     for (let i = 0; i < 10; i++) {
       const res = await fetch(currentUrl, {
@@ -274,7 +272,12 @@ class EdinetClient {
       });
       
       if (res.status === 301 || res.status === 302 || res.status === 307 || res.status === 308) {
-        currentUrl = res.headers.get('location') || currentUrl;
+        const location = res.headers.get('location') || '';
+        // Handle relative URLs and invalid URLs like "notfound.html"
+        if (!location.startsWith('http')) {
+          throw new Error(`EDINET document redirect to invalid URL: ${location}`);
+        }
+        currentUrl = location;
         continue;
       }
       
