@@ -263,13 +263,28 @@ class EdinetClient {
 
   async fetchDocumentText(docId: string): Promise<string> {
     const url = `${this.baseUrl}/documents/${docId}`;
-    const res = await fetch(url, {
-      headers: { 'Ocp-Apim-Subscription-Key': this.subscriptionKey },
-    });
-    if (!res.ok) {
-      throw new Error(`EDINET document fetch failed: ${res.status}`);
+    
+    // EDINET returns XBRL documents with redirects
+    // Node.js fetch has redirect limits, so we handle manually
+    let currentUrl = url;
+    for (let i = 0; i < 10; i++) {
+      const res = await fetch(currentUrl, {
+        headers: { 'Ocp-Apim-Subscription-Key': this.subscriptionKey },
+        redirect: 'manual',
+      });
+      
+      if (res.status === 301 || res.status === 302 || res.status === 307 || res.status === 308) {
+        currentUrl = res.headers.get('location') || currentUrl;
+        continue;
+      }
+      
+      if (!res.ok) {
+        throw new Error(`EDINET document fetch failed: ${res.status}`);
+      }
+      return res.text();
     }
-    return res.text();
+    
+    throw new Error('EDINET document redirect loop');
   }
 
   extractFinancialData(xbrlText: string): {
