@@ -61,6 +61,8 @@ interface PickResult {
   latestTopix: number;
 }
 
+import JSZip from 'jszip';
+
 // ============================================
 // ユーティリティ
 // ============================================
@@ -262,28 +264,53 @@ class EdinetClient {
   }
 
   async fetchDocumentText(docId: string): Promise<string> {
-    const url = `${this.baseUrl}/documents/${docId}`;
-    console.log(`Fetching EDINET document: ${url}`);
+    // EDINET API v2: type=1 は必須（ないと302→notfound.html）
+    const url = `${this.baseUrl}/documents/${docId}?type=1`;
     
-    try {
-      const res = await fetch(url, {
-        headers: { 'Ocp-Apim-Subscription-Key': this.subscriptionKey },
-      });
-      
-      console.log(`EDINET response: status=${res.status}, contentType=${res.headers.get('content-type')}`);
-      
-      if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        throw new Error(`EDINET document fetch failed: ${res.status} ${text.slice(0, 200)}`);
-      }
-      return res.text();
-    } catch (err: any) {
-      console.error(`EDINET fetch error for ${docId}: ${err.message}`);
-      if (err.cause) {
-        console.error(`Cause: ${err.cause.message || err.cause}`);
-      }
-      throw err;
+    const res = await fetch(url, {
+      headers: { 'Ocp-Apim-Subscription-Key': this.subscriptionKey },
+    });
+    
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`EDINET document fetch failed: ${res.status} ${text.slice(0, 200)}`);
     }
+    
+    // ZIPファイルを展開してXBRLテキストを抽出
+    const buffer = await res.arrayBuffer();
+    const zip = await JSZip.loadAsync(buffer);
+    
+    // 必要なファイル（XBRL/XML）を抽出
+    const xbrlFiles = Object.keys(zip.files).filter(
+      (f) => (f.endsWith('.xbrl') || f.endsWith('.xml')) && !f.includes('__MACOSX')
+    );
+    
+    const texts: string[] = [];
+    for (const file of xbrlFiles.slice(0, 3)) {
+      const content = await zip.files[file].async('text');
+      const trimmed = this.extractRelevantSections(content);
+      if (trimmed) texts.push(trimmed);
+    }
+    
+    return texts.join('\n---\n').slice(0, 50000);
+  }
+
+  private extractRelevantSections(xmlText: string): string {
+    const sections: string[] = [];
+    
+    const patterns = [
+      { name: '役員の状況', regex: /<[^>]*?(Officers|Directors|Executive).*?>([\s\S]*?)<\/[^>]*?(Officers|Directors|Executive).*?>/i },
+      { name: '大株主', regex: /<[^>]*?(MajorShareholders).*?>([\s\S]*?)<\/[^>]*?(MajorShareholders).*?>/i },
+      { name: '経営環境', regex: /<[^>]*?(BusinessRisks|ManagementPolicy).*?>([\s\S]*?)<\/[^>]*?(BusinessRisks|ManagementPolicy).*?>/i },
+      { name: '業績概要', regex: /<[^>]*?(OperatingResults|BusinessResults).*?>([\s\S]*?)<\/[^>]*?(OperatingResults|BusinessResults).*?>/i },
+    ];
+    
+    for (const p of patterns) {
+      const match = xmlText.match(p.regex);
+      if (match) sections.push(`【${p.name}】\n${match[0].slice(0, 3000)}`);
+    }
+    
+    return sections.join('\n\n');
   }
 
   extractFinancialData(xbrlText: string): {
