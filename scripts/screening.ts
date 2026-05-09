@@ -257,14 +257,14 @@ class EdinetClient {
     fiscalYearEnd?: string
   ): Promise<Array<{ docId: string; submitDateTime: string; filerName: string }>> {
     const today = new Date();
-    const daysBack = fiscalYearEnd ? 180 : 180;
+    const daysBack = 365; // 1年以内の有価証券報告書を検索
     const from = new Date(today);
     from.setDate(from.getDate() - daysBack);
 
     const params = new URLSearchParams({
       type: '2',
       date: `${formatDate(from)}~${formatDate(today)}`,
-      docTypeList: '["1","2","3"]', // 臨時報告書, 有価証券報告書, 半期・四半期報告書
+      docTypeList: '["2"]', // 有価証券報告書のみ
       sort: 'descending',
       limit: '100',
     });
