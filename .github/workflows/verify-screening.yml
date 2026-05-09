@@ -8,25 +8,33 @@ on:
         required: false
         default: '3'
       max_market_cap:
-        description: 'Max market cap in 億円'
+        description: 'Max market cap (億円)'
         required: false
-        default: '500'
+        default: '2000'
       max_per:
-        description: 'Max real PER (Kiyohara-compliant)'
+        description: 'Max real PER'
         required: false
-        default: '30'
+        default: '50'
       min_score:
-        description: 'Min management score (Kiyohara-compliant)'
+        description: 'Min score (Kiyohara-compliant)'
         required: false
-        default: '60'
+        default: '50'
       watch_per:
         description: 'Watchlist max PER'
         required: false
-        default: '50'
+        default: '80'
       watch_score:
         description: 'Watchlist min score'
         required: false
-        default: '30'
+        default: '10'
+      require_profit:
+        description: 'Require positive profit (true/false)'
+        required: false
+        default: 'false'
+      skip_low_growth:
+        description: 'Skip negative growth stocks (true/false)'
+        required: false
+        default: 'false'
 
 permissions:
   contents: read
@@ -34,7 +42,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -54,4 +62,6 @@ jobs:
           MIN_SCORE: ${{ inputs.min_score }}
           WATCH_PER: ${{ inputs.watch_per }}
           WATCH_SCORE: ${{ inputs.watch_score }}
+          REQUIRE_PROFIT: ${{ inputs.require_profit }}
+          SKIP_LOW_GROWTH: ${{ inputs.skip_low_growth }}
         run: npx tsx scripts/screening.ts
