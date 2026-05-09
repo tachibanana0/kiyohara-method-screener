@@ -262,18 +262,28 @@ class EdinetClient {
   }
 
   async fetchDocumentText(docId: string): Promise<string> {
-    // EDINET API v2: ドキュメント取得
-    // typeパラメータ: 1=ZIP, 2=XBRL, 3=HTML, 4=PDF, 5=CSV
     const url = `${this.baseUrl}/documents/${docId}`;
+    console.log(`Fetching EDINET document: ${url}`);
     
-    const res = await fetch(url, {
-      headers: { 'Ocp-Apim-Subscription-Key': this.subscriptionKey },
-    });
-    
-    if (!res.ok) {
-      throw new Error(`EDINET document fetch failed: ${res.status}`);
+    try {
+      const res = await fetch(url, {
+        headers: { 'Ocp-Apim-Subscription-Key': this.subscriptionKey },
+      });
+      
+      console.log(`EDINET response: status=${res.status}, contentType=${res.headers.get('content-type')}`);
+      
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`EDINET document fetch failed: ${res.status} ${text.slice(0, 200)}`);
+      }
+      return res.text();
+    } catch (err: any) {
+      console.error(`EDINET fetch error for ${docId}: ${err.message}`);
+      if (err.cause) {
+        console.error(`Cause: ${err.cause.message || err.cause}`);
+      }
+      throw err;
     }
-    return res.text();
   }
 
   extractFinancialData(xbrlText: string): {
