@@ -467,6 +467,8 @@ async function runScreening(): Promise<PickResult[]> {
   const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '50', 10);
 const MAX_MARKET_CAP = parseInt(process.env.MAX_MARKET_CAP || '500', 10); // 億円
 const MAX_PER = parseInt(process.env.MAX_PER || '15', 10);
+const SKIP_OWNER_CHECK = process.env.SKIP_OWNER_CHECK === 'true';
+const MIN_SCORE = parseInt(process.env.MIN_SCORE || '60', 10);
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
   const batchIndex = BATCH_SIZE === 50 ? (dayOfWeek - 1 + 5) % 5 : 0; // 0-4 for Mon-Fri, 0 for custom batch
@@ -615,8 +617,8 @@ const MAX_PER = parseInt(process.env.MAX_PER || '15', 10);
 
   for (const item of evaluated) {
     if (
-      item.eval.is_owner_company &&
-      item.eval.management_score >= 60 &&
+      (SKIP_OWNER_CHECK || item.eval.is_owner_company) &&
+      item.eval.management_score >= MIN_SCORE &&
       item.stock.realPER <= MAX_PER
     ) {
       picks.push({

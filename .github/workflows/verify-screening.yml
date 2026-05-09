@@ -15,6 +15,14 @@ on:
         description: 'Max real PER'
         required: false
         default: '15'
+      skip_owner_check:
+        description: 'Skip owner company requirement'
+        required: false
+        default: 'false'
+      min_score:
+        description: 'Min management score'
+        required: false
+        default: '60'
 
 permissions:
   contents: read
@@ -39,4 +47,6 @@ jobs:
           BATCH_SIZE: ${{ inputs.batch_size }}
           MAX_MARKET_CAP: ${{ inputs.max_market_cap }}
           MAX_PER: ${{ inputs.max_per }}
+          SKIP_OWNER_CHECK: ${{ inputs.skip_owner_check }}
+          MIN_SCORE: ${{ inputs.min_score }}
         run: npx tsx scripts/screening.ts

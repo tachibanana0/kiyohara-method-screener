@@ -14,7 +14,7 @@ const app = new Hono<{ Bindings: Cloudflare.Env }>();
 app.use(
   '*',
   cors({
-    origin: ['https://kiyohara-screener.hikakunavi360.com', 'http://localhost:5173'],
+    origin: ['https://kiyohara-screener.hikakunavi360.com', 'https://kiyohara-screener.pages.dev', 'https://*.kiyohara-screener.pages.dev', 'http://localhost:5173'],
     allowMethods: ['GET', 'POST', 'OPTIONS'],
   })
 );
