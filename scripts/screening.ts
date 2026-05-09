@@ -527,6 +527,8 @@ async function runScreening(): Promise<PickResult[]> {
 
   // バッチ処理: 1日50銘柄ずつ、6日で全銘柄カバー
   const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '50', 10);
+const MAX_MARKET_CAP = parseInt(process.env.MAX_MARKET_CAP || '500', 10); // 億円
+const MAX_PER = parseInt(process.env.MAX_PER || '15', 10);
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
   const batchIndex = BATCH_SIZE === 50 ? (dayOfWeek - 1 + 5) % 5 : 0; // 0-4 for Mon-Fri, 0 for custom batch
@@ -555,7 +557,7 @@ async function runScreening(): Promise<PickResult[]> {
     }
 
     try {
-      await sleep(3000); // J-Quants rate limit: ~50 req/min
+      await sleep(5000); // J-Quants rate limit: 3 req/min for free tier
       let statements = await jquants.fetchStatements(sym.Code);
 
       if (statements.length === 0) {
@@ -593,8 +595,8 @@ async function runScreening(): Promise<PickResult[]> {
       }
 
       const marketCap = (priceData.close * shares) / 1e8;
-      if (marketCap > 500) {
-        console.log(`Skip ${sym.Code}: market cap ${marketCap.toFixed(1)}億円 > 500億円`);
+      if (marketCap > MAX_MARKET_CAP) {
+        console.log(`Skip ${sym.Code}: market cap ${marketCap.toFixed(1)}億円 > ${MAX_MARKET_CAP}億円`);
         continue;
       }
 
@@ -607,8 +609,8 @@ async function runScreening(): Promise<PickResult[]> {
       }
 
       const realPER = (marketCap - netCash) / (profit / 1e8);
-      if (realPER > 15 || realPER <= 0) {
-        console.log(`Skip ${sym.Code}: realPER ${realPER.toFixed(1)} > 15`);
+      if (realPER > MAX_PER || realPER <= 0) {
+        console.log(`Skip ${sym.Code}: realPER ${realPER.toFixed(1)} > ${MAX_PER}`);
         continue;
       }
 
@@ -677,7 +679,7 @@ async function runScreening(): Promise<PickResult[]> {
     if (
       item.eval.is_owner_company &&
       item.eval.management_score >= 60 &&
-      item.stock.realPER <= 15
+      item.stock.realPER <= MAX_PER
     ) {
       picks.push({
         code: item.stock.code,
