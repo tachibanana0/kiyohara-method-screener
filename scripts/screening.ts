@@ -249,105 +249,43 @@ class EdinetClient {
     _fiscalYearEnd?: string
   ): Promise<Array<{ docID: string; submitDateTime: string; filerName: string; edinetCode: string }>> {
     const today = new Date();
-    const from = new Date(today);
-    from.setDate(from.getDate() - 365);
-
     const headers = {
       'Content-Type': 'application/json',
       'Ocp-Apim-Subscription-Key': this.subscriptionKey,
     };
+    const secCode4 = secCode.replace(/0$/, ''); // 5桁→4桁
+    const normalizedName = companyName ? normalizeCompanyName(companyName) : '';
 
-    // 1. Try edinetCode (most accurate)
-    if (edinetCode) {
-      const params = new URLSearchParams({
-        type: '2',
-        date: `${formatDate(from)}~${formatDate(today)}`,
-        docTypeList: '["2","3"]',
-        sort: 'descending',
-        limit: '100',
-      });
-      params.set('edinetCode', edinetCode);
-      const url = `${this.baseUrl}/documents.json?${params}`;
+    // Search up to 90 days back, client-side filtering
+    for (let daysBack = 0; daysBack < 90; daysBack++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - daysBack);
+      const dateStr = formatDate(date);
+      const url = `${this.baseUrl}/documents.json?date=${dateStr}&type=2`;
+
       const res = await fetch(url, { headers });
-      if (res.ok) {
-        const data = await res.json() as { results: Array<{ docID: string; submitDateTime: string; filerName: string; docDescription: string; edinetCode: string }> };
-        const reports = (data.results ?? []).filter((r) => {
-          const d = r.docDescription || '';
-          return d.includes('有価証券報告書') || d.includes('半期報告書') || d.includes('四半期報告書');
-        });
-        if (reports.length > 0) return reports.slice(0, 5);
-      }
-    }
+      if (!res.ok) continue;
 
-    // 2. Try secCode (unreliable but worth trying)
-    if (secCode) {
-      const secCode4 = secCode.replace(/0$/, ''); // 5桁→4桁
-      for (const code of [secCode, secCode4]) {
-        const params = new URLSearchParams({
-          type: '2',
-          date: `${formatDate(from)}~${formatDate(today)}`,
-          docTypeList: '["2","3"]',
-          sort: 'descending',
-          limit: '100',
-        });
-        params.set('secCode', code);
-        const url = `${this.baseUrl}/documents.json?${params}`;
-        const res = await fetch(url, { headers });
-        if (res.ok) {
-          const data = await res.json() as { results: Array<{ docID: string; submitDateTime: string; filerName: string; docDescription: string; edinetCode: string }> };
-          const reports = (data.results ?? []).filter((r) => {
-            const d = r.docDescription || '';
-            return d.includes('有価証券報告書') || d.includes('半期報告書') || d.includes('四半期報告書');
-          });
-          if (reports.length > 0) return reports.slice(0, 5);
+      const data = await res.json() as { results?: Array<{ docID: string; submitDateTime: string; filerName: string; docDescription: string; edinetCode: string; secCode: string }> };
+      const results = data.results || [];
+      if (results.length === 0) continue;
+
+      const reports = results.filter((r) => {
+        const d = r.docDescription || '';
+        if (!d.includes('有価証券報告書') && !d.includes('半期報告書') && !d.includes('四半期報告書')) return false;
+        // Match by edinetCode (exact)
+        if (edinetCode && r.edinetCode === edinetCode) return true;
+        // Match by secCode
+        if (r.secCode && (r.secCode === secCode || r.secCode === secCode4)) return true;
+        // Match by filerName (partial, normalized)
+        if (normalizedName && r.filerName) {
+          const filerNorm = normalizeCompanyName(r.filerName);
+          if (filerNorm.includes(normalizedName) || normalizedName.includes(filerNorm)) return true;
         }
-      }
-    }
-
-    // 3. Try filerName (partial match via API parameter)
-    if (companyName) {
-      const params = new URLSearchParams({
-        type: '2',
-        date: `${formatDate(from)}~${formatDate(today)}`,
-        docTypeList: '["2","3"]',
-        sort: 'descending',
-        limit: '100',
+        return false;
       });
-      params.set('filerName', companyName);
-      const url = `${this.baseUrl}/documents.json?${params}`;
-      const res = await fetch(url, { headers });
-      if (res.ok) {
-        const data = await res.json() as { results: Array<{ docID: string; submitDateTime: string; filerName: string; docDescription: string; edinetCode: string }> };
-        const reports = (data.results ?? []).filter((r) => {
-          const d = r.docDescription || '';
-          return d.includes('有価証券報告書') || d.includes('半期報告書') || d.includes('四半期報告書');
-        });
-        if (reports.length > 0) return reports.slice(0, 5);
-      }
-    }
 
-    // 4. Broad search + post-filter by company name
-    if (companyName) {
-      const params = new URLSearchParams({
-        type: '2',
-        date: `${formatDate(from)}~${formatDate(today)}`,
-        docTypeList: '["2","3"]',
-        sort: 'descending',
-        limit: '100',
-      });
-      const url = `${this.baseUrl}/documents.json?${params}`;
-      const res = await fetch(url, { headers });
-      if (res.ok) {
-        const data = await res.json() as { results: Array<{ docID: string; submitDateTime: string; filerName: string; docDescription: string; edinetCode: string }> };
-        const normalized = normalizeCompanyName(companyName);
-        const reports = (data.results ?? []).filter((r) => {
-          const d = r.docDescription || '';
-          if (!d.includes('有価証券報告書') && !d.includes('半期報告書') && !d.includes('四半期報告書')) return false;
-          const filerNorm = normalizeCompanyName(r.filerName || '');
-          return filerNorm.includes(normalized) || normalized.includes(filerNorm);
-        });
-        if (reports.length > 0) return reports.slice(0, 5);
-      }
+      if (reports.length > 0) return reports.slice(0, 5);
     }
 
     return [];
