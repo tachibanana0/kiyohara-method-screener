@@ -276,45 +276,43 @@ class EdinetClient {
       throw new Error(`EDINET document fetch failed: ${res.status} ${text.slice(0, 200)}`);
     }
     
-    // ZIPファイルを展開してXBRLテキストを抽出
+    // ZIPファイルを展開してHTMLテキストを抽出
     const buffer = await res.arrayBuffer();
     const zip = await JSZip.loadAsync(buffer);
     
-    // .xbrlファイルを優先、なければ.xml
+    // HTMLファイル（ixbrl.htm）を優先。XBRLは補助的に使用
+    const htmlFiles = Object.keys(zip.files).filter(
+      (f) => f.endsWith('.htm') && f.includes('PublicDoc') && !f.includes('__MACOSX')
+    );
     const xbrlFiles = Object.keys(zip.files).filter(
       (f) => f.endsWith('.xbrl') && !f.includes('__MACOSX')
     );
-    const xmlFiles = Object.keys(zip.files).filter(
-      (f) => f.endsWith('.xml') && !f.includes('__MACOSX')
-    );
-    const targetFiles = xbrlFiles.length > 0 ? xbrlFiles : xmlFiles;
     
     const texts: string[] = [];
-    for (const file of targetFiles.slice(0, 3)) {
+    
+    // HTMLファイルからテキストを抽出（最初の2ファイル）
+    for (const file of htmlFiles.slice(0, 2)) {
       const content = await zip.files[file].async('text');
-      const trimmed = this.extractRelevantSections(content);
-      if (trimmed) texts.push(trimmed);
+      // HTMLタグを除去してテキストのみ抽出
+      const text = content.replace(/<[^>]*>/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#\d+;/g, '');
+      // 空白を整理
+      const cleaned = text.replace(/\s+/g, ' ').trim();
+      if (cleaned.length > 100) {
+        texts.push(cleaned);
+      }
+    }
+    
+    // HTMLがなければXBRLを使用
+    if (texts.length === 0) {
+      for (const file of xbrlFiles.slice(0, 2)) {
+        const content = await zip.files[file].async('text');
+        const cleaned = content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (cleaned.length > 100) texts.push(cleaned);
+      }
     }
     
     return texts.join('\n---\n').slice(0, 50000);
   }
-
-  private extractRelevantSections(xmlText: string): string {
-    const sections: string[] = [];
-    
-    const patterns = [
-      { name: '役員の状況', regex: /(?:InformationAboutOfficers|役員の状況|Officer|Director)[^<]{0,100}(?:状況|Status)/i },
-      { name: '大株主', regex: /(?:MajorShareholders|大株主)/i },
-      { name: '経営環境', regex: /(?:BusinessRisks|経営環境|対処すべき課題|ManagementPolicy)/i },
-      { name: '業績概要', regex: /(?:OperatingResults|業績|BusinessResults|事業の状況)/i },
-    ];
-    
-    for (const p of patterns) {
-      const match = xmlText.match(new RegExp(`.{0,200}${p.regex.source}.{0,3000}`, 'is'));
-      if (match) sections.push(`【${p.name}】\n${match[0].slice(0, 3000)}`);
-    }
-    
-    return sections.join('\n\n');
   }
 
   extractFinancialData(xbrlText: string): {
