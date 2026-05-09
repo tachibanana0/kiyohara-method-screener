@@ -8,63 +8,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Test EDINET API endpoints
+      - run: npm install
+
+      - name: Run EDINET Verification
         env:
           EDINET_SUBSCRIPTION_KEY: ${{ secrets.EDINET_SUBSCRIPTION_KEY }}
-        run: |
-          echo "=== Test 1: v1 corporates.json ==="
-          curl -s -w "\nHTTP Status: %{http_code}\nContent-Type: %{content_type}\n" \
-            "https://disclosure.edinet-fsa.go.jp/api/v1/corporates.json" \
-            -H "Ocp-Apim-Subscription-Key: $EDINET_SUBSCRIPTION_KEY" | head -20
-          
-          echo ""
-          echo "=== Test 2: v2 documents with edinetCode filter ==="
-          curl -s -w "\nHTTP Status: %{http_code}\n" \
-            "https://disclosure.edinet-fsa.go.jp/api/v2/documents.json?date=2026-05-08&type=2&edinetCode=E02143" \
-            -H "Ocp-Apim-Subscription-Key: $EDINET_SUBSCRIPTION_KEY" | node -e "
-              const input = require('fs').readFileSync('/dev/stdin', 'utf8');
-              const lines = input.split('\n');
-              // Find the JSON line
-              for (const line of lines) {
-                if (line.startsWith('{')) {
-                  try {
-                    const data = JSON.parse(line);
-                    console.log('Results count:', (data.results || []).length);
-                    (data.results || []).slice(0, 3).forEach(r => {
-                      console.log({ docId: r.docID, secCode: r.secCode, desc: r.docDescription });
-                    });
-                    break;
-                  } catch(e) {}
-                }
-              }
-            "
-          
-          echo ""
-          echo "=== Test 3: v2 documents with SECCODE filter ==="
-          curl -s -w "\nHTTP Status: %{http_code}\n" \
-            "https://disclosure.edinet-fsa.go.jp/api/v2/documents.json?date=2026-05-08&type=2&SECCODE=2173" \
-            -H "Ocp-Apim-Subscription-Key: $EDINET_SUBSCRIPTION_KEY" | node -e "
-              const input = require('fs').readFileSync('/dev/stdin', 'utf8');
-              const lines = input.split('\n');
-              for (const line of lines) {
-                if (line.startsWith('{')) {
-                  try {
-                    const data = JSON.parse(line);
-                    console.log('Results count:', (data.results || []).length);
-                    (data.results || []).slice(0, 3).forEach(r => {
-                      console.log({ docId: r.docID, secCode: r.secCode, edinetCode: r.edinetCode, desc: r.docDescription });
-                    });
-                    break;
-                  } catch(e) {}
-                }
-              }
-            "
-          
-          echo ""
-          echo "=== Test 4: Check if v1 corporates returns HTML ==="
-          curl -s "https://disclosure.edinet-fsa.go.jp/api/v1/corporates.json" \
-            -H "Ocp-Apim-Subscription-Key: $EDINET_SUBSCRIPTION_KEY" | head -5
+        run: npx tsx scripts/verify-edinet-mapping.ts
