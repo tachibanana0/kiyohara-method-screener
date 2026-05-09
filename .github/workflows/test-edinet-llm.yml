@@ -1,0 +1,33 @@
+name: Test EDINET + LLM
+
+on:
+  workflow_dispatch:
+    inputs:
+      code:
+        description: 'Stock code'
+        required: true
+        default: '21730'
+      name:
+        description: 'Company name'
+        required: true
+        default: '博展'
+      docId:
+        description: 'EDINET doc ID'
+        required: true
+        default: 'S100R46H'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+      - name: Run Test
+        env:
+          EDINET_SUBSCRIPTION_KEY: ${{ secrets.EDINET_SUBSCRIPTION_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: npx tsx scripts/test-edinet-llm.ts ${{ github.event.inputs.code }} ${{ github.event.inputs.name }} ${{ github.event.inputs.docId }}
