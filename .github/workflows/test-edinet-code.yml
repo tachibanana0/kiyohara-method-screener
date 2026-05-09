@@ -20,4 +20,4 @@ jobs:
         env:
           EDINET_SUBSCRIPTION_KEY: ${{ secrets.EDINET_SUBSCRIPTION_KEY }}
           JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
-        run: npx tsx scripts/check-edinet-raw.ts
+        run: npx tsx scripts/find-report-dates.ts
