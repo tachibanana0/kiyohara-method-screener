@@ -14,7 +14,7 @@ on:
       max_per:
         description: 'Max real PER (Kiyohara-compliant)'
         required: false
-        default: '10'
+        default: '30'
       min_score:
         description: 'Min management score (Kiyohara-compliant)'
         required: false
@@ -22,11 +22,11 @@ on:
       watch_per:
         description: 'Watchlist max PER'
         required: false
-        default: '20'
+        default: '50'
       watch_score:
         description: 'Watchlist min score'
         required: false
-        default: '40'
+        default: '30'
 
 permissions:
   contents: read
@@ -34,7 +34,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

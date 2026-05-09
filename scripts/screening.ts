@@ -467,12 +467,12 @@ async function runScreening(): Promise<PickResult[]> {
   // バッチ処理: 1日50銘柄ずつ、6日で全銘柄カバー
   const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '50', 10);
 // 選定基準 (Kiyohara-strict)
-const MAX_MARKET_CAP = parseInt(process.env.MAX_MARKET_CAP || '500', 10);
-const MAX_PER = parseInt(process.env.MAX_PER || '10', 10);
+const MAX_MARKET_CAP = parseInt(process.env.MAX_MARKET_CAP || '1000', 10);
+const MAX_PER = parseInt(process.env.MAX_PER || '30', 10);
 const MIN_SCORE = parseInt(process.env.MIN_SCORE || '60', 10);
 // 監視対象 (Watchlist) — 清原基準から外れても拾う閾値
-const WATCH_PER = parseInt(process.env.WATCH_PER || '20', 10);
-const WATCH_SCORE = parseInt(process.env.WATCH_SCORE || '40', 10);
+const WATCH_PER = parseInt(process.env.WATCH_PER || '50', 10);
+const WATCH_SCORE = parseInt(process.env.WATCH_SCORE || '30', 10);
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
   const batchIndex = BATCH_SIZE === 50 ? (dayOfWeek - 1 + 5) % 5 : 0; // 0-4 for Mon-Fri, 0 for custom batch
