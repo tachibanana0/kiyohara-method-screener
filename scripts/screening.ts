@@ -235,8 +235,10 @@ class EdinetClient {
   ): Promise<Array<{ docId: string; submitDateTime: string; filerName: string }>> {
     const today = new Date();
     const results: Array<{ docId: string; submitDateTime: string; filerName: string }> = [];
+    // secCodeの正規化: 末尾の0を除外した4桁コードも試す
+    const secCodeNormalized = secCode.replace(/0$/, '');
 
-    for (let daysBack = 0; daysBack < 60; daysBack++) {
+    for (let daysBack = 0; daysBack < 120; daysBack++) {
       const date = new Date(today);
       date.setDate(date.getDate() - daysBack);
       const dateStr = date.toISOString().slice(0, 10);
@@ -256,7 +258,7 @@ class EdinetClient {
         if (!isYukashoken) continue;
         
         const matchEdinet = edinetCode && doc.edinetCode === edinetCode;
-        const matchSecCode = doc.secCode === secCode;
+        const matchSecCode = doc.secCode === secCode || doc.secCode === secCodeNormalized;
         const matchName = companyName && doc.filerName?.includes(companyName);
 
         if (matchEdinet || matchSecCode || matchName) {
