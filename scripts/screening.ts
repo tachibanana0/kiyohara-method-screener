@@ -18,7 +18,6 @@ interface JQuantsSymbol {
   Code: string;
   CoName: string;
   Mkt: string;
-  EdinetCode?: string;
 }
 
 interface JQuantsStatement {
@@ -523,12 +522,8 @@ async function runScreening(): Promise<PickResult[]> {
   });
   console.log(`Target: ${targetSymbols.length} TSE Growth stocks`);
 
-  // Build edinetCode map from v2 API response (v1 endpoint returns 403)
+  // edinetCode map — dynamically built from EDINET API search results
   const edinetCodeMap = new Map<string, string>();
-  for (const s of symbols) {
-    if (s.EdinetCode) edinetCodeMap.set(s.Code, s.EdinetCode);
-  }
-  console.log(`EdinetCode map: ${edinetCodeMap.size} entries`);
 
   // バッチ処理: 1日50銘柄ずつ、6日で全銘柄カバー
   const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '50', 10);
@@ -565,9 +560,11 @@ async function runScreening(): Promise<PickResult[]> {
 
       if (statements.length === 0) {
         console.log(`J-Quants 403 for ${sym.Code}, trying EDINET fallback...`);
-        const edinetCode = edinetCodeMap.get(sym.Code) || sym.EdinetCode;
+        const edinetCode = edinetCodeMap.get(sym.Code) || undefined;
         const reports = await edinet.fetchLatestYukashokenReports(sym.Code, sym.CoName, edinetCode);
         if (reports.length > 0) {
+          // Cache edinetCode from successful EDINET search
+          if (reports[0].edinetCode) edinetCodeMap.set(sym.Code, reports[0].edinetCode);
           const xbrlText = await edinet.fetchDocumentText(reports[0].docID);
           const fin = edinet.extractFinancialData(xbrlText);
           if (fin) {
