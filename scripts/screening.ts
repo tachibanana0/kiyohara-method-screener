@@ -113,26 +113,34 @@ class JQuantsClient {
     return data.data || [];
   }
 
-  async fetchStatements(code: string): Promise<JQuantsStatement[]> {
-    try {
-      const data = await this.fetchJson<{ data: JQuantsStatement[] }>(`/fins/summary?code=${code}`);
-      return (data.data || [])
-        .map((s) => ({
-          ...s,
-          Sales: Number(s.Sales) || 0,
-          OP: Number(s.OP) || 0,
-          NP: Number(s.NP) || 0,
-          CashEq: Number(s.CashEq) || 0,
-          ShOutFY: Number(s.ShOutFY) || 0,
-        }))
-        .sort((a, b) => new Date(a.CurPerEn).getTime() - new Date(b.CurPerEn).getTime());
-    } catch (err: any) {
-      if (err.message?.includes('403') || err.message?.includes('429')) {
-        console.warn(`J-Quants ${err.message?.includes('403') ? '403' : '429'} for ${code}`);
-        return [];
+  async fetchStatements(code: string, retries = 2): Promise<JQuantsStatement[]> {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const data = await this.fetchJson<{ data: JQuantsStatement[] }>(`/fins/summary?code=${code}`);
+        return (data.data || [])
+          .map((s) => ({
+            ...s,
+            Sales: Number(s.Sales) || 0,
+            OP: Number(s.OP) || 0,
+            NP: Number(s.NP) || 0,
+            CashEq: Number(s.CashEq) || 0,
+            ShOutFY: Number(s.ShOutFY) || 0,
+          }))
+          .sort((a, b) => new Date(a.CurPerEn).getTime() - new Date(b.CurPerEn).getTime());
+      } catch (err: any) {
+        if ((err.message?.includes('403') || err.message?.includes('429')) && attempt < retries) {
+          console.warn(`J-Quants rate limited for ${code}, retry ${attempt + 1}/${retries}...`);
+          await sleep(30000);
+          continue;
+        }
+        if (err.message?.includes('403') || err.message?.includes('429')) {
+          console.warn(`J-Quants rate limited for ${code}, skipping after ${retries} retries`);
+          return [];
+        }
+        throw err;
       }
-      throw err;
     }
+    return [];
   }
 }
 
@@ -354,22 +362,20 @@ class OpenRouterClient {
   }
 
   async evaluateCompany(docText: string): Promise<LlmEvaluation> {
-    const prompt = `以下の有価証券報告書の内容を読み、清原メソッドの基準で評価してください。
+    const prompt = `You are a stock analyst evaluating companies using the Kiyohara Method.
 
-評価基準:
-1. オーナー企業かどうか（創業家経営、同族企業など）
-2. 経営の質（1-100点）
+Evaluate the following securities report and respond with ONLY a JSON object. Do not include any explanation or text outside the JSON.
 
-出力形式:
-{
-  "is_owner_company": 0 または 1,
-  "management_score": 1-100の数値,
-  "reason": "評価理由を簡潔に"
-}
+Criteria:
+1. is_owner_company: 1 if owner-managed (founder family, same family name as company name, etc.), 0 otherwise
+2. management_score: 1-100 (higher = better management quality)
+3. reason: Brief reason in Japanese
 
----
-${docText.slice(0, 8000)}
----`;
+Respond with ONLY this JSON format:
+{"is_owner_company": 0, "management_score": 50, "reason": "理由"}
+
+Document:
+${docText.slice(0, 8000)}`;
 
     const res = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -400,6 +406,7 @@ ${docText.slice(0, 8000)}
       }
     } catch (err) {
       console.warn('Failed to parse LLM response:', err);
+      console.warn('Raw content:', content.slice(0, 200));
     }
 
     return {
@@ -467,7 +474,7 @@ async function runScreening(): Promise<PickResult[]> {
     }
 
     try {
-      await sleep(20000);
+      await sleep(25000); // J-Quants rate limit: 3 req/min
       let statements = await jquants.fetchStatements(sym.Code);
 
       if (statements.length === 0) {
