@@ -1,0 +1,27 @@
+name: Verify Screening (Quick Test)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+      - name: Run Screening (3 stocks)
+        env:
+          JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
+          EDINET_SUBSCRIPTION_KEY: ${{ secrets.EDINET_SUBSCRIPTION_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          SCREENING_API_URL: ${{ secrets.SCREENING_API_URL }}
+          SCREENING_API_TOKEN: ${{ secrets.SCREENING_API_TOKEN }}
+          BATCH_SIZE: '3'
+        run: npx tsx scripts/screening.ts

@@ -531,10 +531,10 @@ async function runScreening(): Promise<PickResult[]> {
   console.log(`EdinetCode map: ${edinetCodeMap.size} entries`);
 
   // バッチ処理: 1日50銘柄ずつ、6日で全銘柄カバー
-  const BATCH_SIZE = 50;
+  const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '50', 10);
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
-  const batchIndex = (dayOfWeek - 1 + 5) % 5; // 0-4 for Mon-Fri
+  const batchIndex = BATCH_SIZE === 50 ? (dayOfWeek - 1 + 5) % 5 : 0; // 0-4 for Mon-Fri, 0 for custom batch
   const startIdx = batchIndex * BATCH_SIZE;
   const endIdx = Math.min(startIdx + BATCH_SIZE, targetSymbols.length);
   const batchSymbols = targetSymbols.slice(startIdx, endIdx);
