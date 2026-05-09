@@ -280,13 +280,17 @@ class EdinetClient {
     const buffer = await res.arrayBuffer();
     const zip = await JSZip.loadAsync(buffer);
     
-    // 必要なファイル（XBRL/XML）を抽出
+    // .xbrlファイルを優先、なければ.xml
     const xbrlFiles = Object.keys(zip.files).filter(
-      (f) => (f.endsWith('.xbrl') || f.endsWith('.xml')) && !f.includes('__MACOSX')
+      (f) => f.endsWith('.xbrl') && !f.includes('__MACOSX')
     );
+    const xmlFiles = Object.keys(zip.files).filter(
+      (f) => f.endsWith('.xml') && !f.includes('__MACOSX')
+    );
+    const targetFiles = xbrlFiles.length > 0 ? xbrlFiles : xmlFiles;
     
     const texts: string[] = [];
-    for (const file of xbrlFiles.slice(0, 3)) {
+    for (const file of targetFiles.slice(0, 3)) {
       const content = await zip.files[file].async('text');
       const trimmed = this.extractRelevantSections(content);
       if (trimmed) texts.push(trimmed);
@@ -299,14 +303,14 @@ class EdinetClient {
     const sections: string[] = [];
     
     const patterns = [
-      { name: '役員の状況', regex: /<[^>]*?(Officers|Directors|Executive).*?>([\s\S]*?)<\/[^>]*?(Officers|Directors|Executive).*?>/i },
-      { name: '大株主', regex: /<[^>]*?(MajorShareholders).*?>([\s\S]*?)<\/[^>]*?(MajorShareholders).*?>/i },
-      { name: '経営環境', regex: /<[^>]*?(BusinessRisks|ManagementPolicy).*?>([\s\S]*?)<\/[^>]*?(BusinessRisks|ManagementPolicy).*?>/i },
-      { name: '業績概要', regex: /<[^>]*?(OperatingResults|BusinessResults).*?>([\s\S]*?)<\/[^>]*?(OperatingResults|BusinessResults).*?>/i },
+      { name: '役員の状況', regex: /(?:InformationAboutOfficers|役員の状況|Officer|Director)[^<]{0,100}(?:状況|Status)/i },
+      { name: '大株主', regex: /(?:MajorShareholders|大株主)/i },
+      { name: '経営環境', regex: /(?:BusinessRisks|経営環境|対処すべき課題|ManagementPolicy)/i },
+      { name: '業績概要', regex: /(?:OperatingResults|業績|BusinessResults|事業の状況)/i },
     ];
     
     for (const p of patterns) {
-      const match = xmlText.match(p.regex);
+      const match = xmlText.match(new RegExp(`.{0,200}${p.regex.source}.{0,3000}`, 'is'));
       if (match) sections.push(`【${p.name}】\n${match[0].slice(0, 3000)}`);
     }
     
