@@ -257,32 +257,41 @@ class EdinetClient {
     fiscalYearEnd?: string
   ): Promise<Array<{ docId: string; submitDateTime: string; filerName: string }>> {
     const today = new Date();
-    const results: Array<{ docId: string; submitDateTime: string; filerName: string }> = [];
-    // secCodeの正規化: 末尾の0を除外した4桁コードも試す
-    const secCodeNormalized = secCode.replace(/0$/, '');
+    const daysBack = fiscalYearEnd ? 180 : 180;
+    const from = new Date(today);
+    from.setDate(from.getDate() - daysBack);
 
-    // 決算期から検索期間を計算（決算後3ヶ月+余裕30日）
-    let searchStartDays: number;
-    let searchEndDays: number;
-    if (fiscalYearEnd) {
-      const fyEnd = new Date(fiscalYearEnd);
-      const filingDeadline = new Date(fyEnd);
-      filingDeadline.setMonth(filingDeadline.getMonth() + 3);
-      const searchEnd = new Date(filingDeadline);
-      searchEnd.setDate(searchEnd.getDate() + 30); // 余裕30日
+    const params = new URLSearchParams({
+      type: '2',
+      date: `${formatDate(from)}~${formatDate(today)}`,
+      docTypeList: '["1","2","3"]', // 臨時報告書, 有価証券報告書, 半期・四半期報告書
+      sort: 'descending',
+      limit: '100',
+    });
 
-      const todayTime = today.getTime();
-      const fyEndTime = fyEnd.getTime();
-      const searchEndTime = searchEnd.getTime();
-
-      searchStartDays = Math.max(0, Math.floor((todayTime - searchEndTime) / (1000 * 60 * 60 * 24)));
-      searchEndDays = Math.max(60, Math.floor((todayTime - fyEndTime) / (1000 * 60 * 60 * 24)));
-
-      console.log(`EDINET search window: fiscalYearEnd=${fiscalYearEnd}, searchDays=${searchStartDays}-${searchEndDays}`);
-    } else {
-      searchStartDays = 0;
-      searchEndDays = 120;
+    if (edinetCode) {
+      params.set('edinetCode', edinetCode);
+    } else if (secCode) {
+      params.set('secCode', secCode);
     }
+
+    const url = `${this.baseUrl}/documents.json?${params}`;
+    const res = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        'X-EDINETAPISubscriptionKey': this.subscriptionKey,
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`EDINET API error: ${res.status}`);
+    }
+
+    const data = await res.json() as { results: Array<{ docId: string; submitDateTime: string; filerName: string; docDescription: string }> };
+    return (data.results ?? [])
+      .filter((r) => r.docDescription.includes('有価証券報告書') || r.docDescription.includes('半期報告書') || r.docDescription.includes('四半期報告書'))
+      .slice(0, 5);
+  }
 
     for (let daysBack = searchStartDays; daysBack <= searchEndDays; daysBack++) {
       const date = new Date(today);
@@ -412,7 +421,7 @@ class OpenRouterClient {
   async evaluateCompany(docText: string): Promise<LlmEvaluation> {
     const prompt = `You are a stock analyst evaluating companies using the Kiyohara Method.
 
-Evaluate the following securities report and respond with ONLY a JSON object. Do not include any explanation or text outside the JSON.
+Evaluate the following financial report (annual, semi-annual, or quarterly) and respond with ONLY a JSON object. Do not include any explanation or text outside the JSON.
 
 Criteria:
 1. is_owner_company: 1 if owner-managed (founder family, same family name as company name, etc.), 0 otherwise
