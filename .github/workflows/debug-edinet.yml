@@ -1,0 +1,25 @@
+name: Debug EDINET
+
+on:
+  workflow_dispatch:
+    inputs:
+      docId:
+        description: 'EDINET document ID to test'
+        required: true
+        default: 'S100Q4XB'
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run EDINET Debug
+        env:
+          EDINET_SUBSCRIPTION_KEY: ${{ secrets.EDINET_SUBSCRIPTION_KEY }}
+        run: npx tsx scripts/debug-edinet.ts ${{ github.event.inputs.docId }}
