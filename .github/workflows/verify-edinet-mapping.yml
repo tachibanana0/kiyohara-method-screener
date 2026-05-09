@@ -1,0 +1,71 @@
+name: Verify EDINET Mapping
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Test EDINET Corporate List API
+        env:
+          EDINET_SUBSCRIPTION_KEY: ${{ secrets.EDINET_SUBSCRIPTION_KEY }}
+        run: |
+          echo "=== Step 1: Fetch corporate list ==="
+          curl -s "https://disclosure.edinet-fsa.go.jp/api/v1/corporates.json" \
+            -H "Ocp-Apim-Subscription-Key: $EDINET_SUBSCRIPTION_KEY" \
+            -o /tmp/corporates.json
+          
+          echo "File size: $(wc -c < /tmp/corporates.json) bytes"
+          echo ""
+          
+          echo "=== Step 2: Parse and count ==="
+          node -e "
+            const data = JSON.parse(require('fs').readFileSync('/tmp/corporates.json', 'utf8'));
+            const results = data.results || [];
+            console.log('Total corporates:', results.length);
+            
+            // Show sample
+            const samples = results.slice(0, 5);
+            console.log('\nSample entries:');
+            samples.forEach(c => {
+              console.log({
+                edinetCode: c['EDINET Code'],
+                secCode: c['Securities Code'],
+                name: c['Name'],
+                nameEn: c['Name En']
+              });
+            });
+            
+            // Count how many have secCode
+            const withSecCode = results.filter(c => c['Securities Code'] && c['Securities Code'] !== '');
+            console.log('\nWith Securities Code:', withSecCode.length);
+            console.log('Without Securities Code:', results.length - withSecCode.length);
+            
+            // Build mapping sample
+            const mapping = {};
+            withSecCode.slice(0, 10).forEach(c => {
+              mapping[c['Securities Code']] = c['EDINET Code'];
+            });
+            console.log('\nSample mapping (secCode -> edinetCode):');
+            console.log(JSON.stringify(mapping, null, 2));
+          "
+          
+          echo ""
+          echo "=== Step 3: Test filtered search ==="
+          # Try searching with edinetCode directly
+          curl -s "https://disclosure.edinet-fsa.go.jp/api/v2/documents.json?date=2026-05-08&type=2&edinetCode=E02143" \
+            -H "Ocp-Apim-Subscription-Key: $EDINET_SUBSCRIPTION_KEY" \
+            | node -e "
+              const data = JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8'));
+              const results = data.results || [];
+              console.log('Filtered results for E02143:', results.length);
+              results.forEach(r => {
+                console.log({ docId: r.docID, desc: r.docDescription });
+              });
+            "
