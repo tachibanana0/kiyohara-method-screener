@@ -19,6 +19,8 @@ jobs:
         with:
           node-version: '20'
 
+      - run: npm install
+
       - name: Run EDINET Debug
         env:
           EDINET_SUBSCRIPTION_KEY: ${{ secrets.EDINET_SUBSCRIPTION_KEY }}
