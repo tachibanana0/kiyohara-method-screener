@@ -60,6 +60,7 @@ interface PickResult {
   managementScore: number;
   latestPrice: number;
   latestTopix: number;
+  isKiyoharaCompliant: boolean;
 }
 
 import JSZip from 'jszip';
@@ -465,10 +466,13 @@ async function runScreening(): Promise<PickResult[]> {
 
   // バッチ処理: 1日50銘柄ずつ、6日で全銘柄カバー
   const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '50', 10);
-const MAX_MARKET_CAP = parseInt(process.env.MAX_MARKET_CAP || '500', 10); // 億円
-const MAX_PER = parseInt(process.env.MAX_PER || '15', 10);
-const SKIP_OWNER_CHECK = process.env.SKIP_OWNER_CHECK === 'true';
+// 選定基準 (Kiyohara-strict)
+const MAX_MARKET_CAP = parseInt(process.env.MAX_MARKET_CAP || '500', 10);
+const MAX_PER = parseInt(process.env.MAX_PER || '10', 10);
 const MIN_SCORE = parseInt(process.env.MIN_SCORE || '60', 10);
+// 監視対象 (Watchlist) — 清原基準から外れても拾う閾値
+const WATCH_PER = parseInt(process.env.WATCH_PER || '20', 10);
+const WATCH_SCORE = parseInt(process.env.WATCH_SCORE || '40', 10);
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
   const batchIndex = BATCH_SIZE === 50 ? (dayOfWeek - 1 + 5) % 5 : 0; // 0-4 for Mon-Fri, 0 for custom batch
@@ -612,14 +616,17 @@ const MIN_SCORE = parseInt(process.env.MIN_SCORE || '60', 10);
 
   console.log(`Step 5 complete: ${evaluated.length} stocks evaluated`);
 
-  console.log('Step 6: Pick選定');
+  console.log('Step 6: Pick選定 (2-Tier)');
   const picks: PickResult[] = [];
+  const pickedCodes = new Set<string>();
 
+  // Tier 1: 清原メソッド完全適合
   for (const item of evaluated) {
     if (
-      (SKIP_OWNER_CHECK || item.eval.is_owner_company) &&
+      item.eval.is_owner_company &&
       item.eval.management_score >= MIN_SCORE &&
-      item.stock.realPER <= MAX_PER
+      item.stock.realPER <= MAX_PER &&
+      item.stock.realPER > 0
     ) {
       picks.push({
         code: item.stock.code,
@@ -633,12 +640,40 @@ const MIN_SCORE = parseInt(process.env.MIN_SCORE || '60', 10);
         managementScore: item.eval.management_score,
         latestPrice: item.stock.latestPrice,
         latestTopix: item.stock.latestTopix,
+        isKiyoharaCompliant: true,
       });
-      console.log(`PICK: ${item.stock.code} ${item.stock.name}`);
+      pickedCodes.add(item.stock.code);
+      console.log(`PICK (清原適合): ${item.stock.code} ${item.stock.name}`);
     }
   }
 
-  console.log(`Step 6 complete: ${picks.length} picks selected`);
+  // Tier 2: 監視対象 (Watchlist) — 清原基準は満たさないが近い
+  for (const item of evaluated) {
+    if (pickedCodes.has(item.stock.code)) continue;
+    if (
+      item.eval.management_score >= WATCH_SCORE &&
+      item.stock.realPER <= WATCH_PER &&
+      item.stock.realPER > 0
+    ) {
+      picks.push({
+        code: item.stock.code,
+        name: item.stock.name,
+        marketCap: item.stock.marketCap,
+        netCash: item.stock.netCash,
+        realPER: item.stock.realPER,
+        salesGrowth3Y: item.stock.salesGrowth3Y,
+        profitGrowth3Y: item.stock.profitGrowth3Y,
+        isOwnerCompany: item.eval.is_owner_company,
+        managementScore: item.eval.management_score,
+        latestPrice: item.stock.latestPrice,
+        latestTopix: item.stock.latestTopix,
+        isKiyoharaCompliant: false,
+      });
+      console.log(`PICK (監視): ${item.stock.code} ${item.stock.name} (score=${item.eval.management_score}, PER=${item.stock.realPER.toFixed(1)}, owner=${item.eval.is_owner_company})`);
+    }
+  }
+
+  console.log(`Step 6 complete: ${picks.length} picks (${picks.filter(p => p.isKiyoharaCompliant).length} 適合, ${picks.filter(p => !p.isKiyoharaCompliant).length} 監視)`);
   return picks;
 }
 

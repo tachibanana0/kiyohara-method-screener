@@ -151,6 +151,7 @@ app.post('/api/screening/receive', async (c) => {
         managementScore: pick.managementScore ?? 0,
         latestPrice: pick.latestPrice,
         latestTopix: pick.latestTopix,
+        kiyoharaCompliant: pick.isKiyoharaCompliant ?? true,
       });
       saved++;
     } catch (err) {

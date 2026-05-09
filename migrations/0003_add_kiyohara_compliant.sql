@@ -1,0 +1,1 @@
+ALTER TABLE picks ADD COLUMN kiyohara_compliant INTEGER NOT NULL DEFAULT 1;

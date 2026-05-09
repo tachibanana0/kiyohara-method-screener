@@ -91,13 +91,14 @@ export class ScreenerDB {
     managementScore: number;
     latestPrice: number;
     latestTopix: number;
+    kiyoharaCompliant: boolean;
   }): Promise<void> {
     await this.db
       .prepare(
         `INSERT INTO picks
          (code, name, market_cap, net_cash, real_per, sales_growth, profit_growth,
-          is_owner_company, management_score, initial_price, initial_topix, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+          is_owner_company, management_score, initial_price, initial_topix, kiyohara_compliant, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
          ON CONFLICT(code) DO UPDATE SET
            name = excluded.name,
            market_cap = excluded.market_cap,
@@ -107,6 +108,7 @@ export class ScreenerDB {
            profit_growth = excluded.profit_growth,
            is_owner_company = excluded.is_owner_company,
            management_score = excluded.management_score,
+           kiyohara_compliant = excluded.kiyohara_compliant,
            initial_price = COALESCE(picks.initial_price, excluded.initial_price),
            initial_topix = COALESCE(picks.initial_topix, excluded.initial_topix),
            status = 'active',
@@ -123,7 +125,8 @@ export class ScreenerDB {
         stock.isOwnerCompany ? 1 : 0,
         stock.managementScore,
         stock.latestPrice,
-        stock.latestTopix
+        stock.latestTopix,
+        stock.kiyoharaCompliant ? 1 : 0
       )
       .run();
   }
