@@ -115,26 +115,6 @@ class JQuantsClient {
     return data.data || [];
   }
 
-  async fetchEdinetCode(code: string): Promise<string | null> {
-    try {
-      const url = `https://api.jquants.com/v1/listed?code=${code}`;
-      const res = await fetch(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': this.apiKey,
-        },
-      });
-      if (!res.ok) return null;
-      const data = await res.json() as { info: Array<{ Code: string; EdinetCode: string }> };
-      if (data.info && data.info.length > 0) {
-        return data.info[0].EdinetCode || null;
-      }
-    } catch (err) {
-      console.warn(`Failed to fetch edinetCode for ${code}:`, err);
-    }
-    return null;
-  }
-
   async fetchStatements(code: string, retries = 2): Promise<JQuantsStatement[]> {
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
@@ -241,6 +221,19 @@ class YahooFinanceClient {
 // EDINET API クライアント
 // ============================================
 
+function formatDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function normalizeCompanyName(name: string): string {
+  return name
+    .replace(/株式会社/g, '')
+    .replace(/（株）/g, '')
+    .replace(/\(株\)/g, '')
+    .replace(/\s+/g, '')
+    .trim();
+}
+
 class EdinetClient {
   private baseUrl: string;
   private subscriptionKey: string;
@@ -254,82 +247,111 @@ class EdinetClient {
     secCode: string,
     companyName?: string,
     edinetCode?: string,
-    fiscalYearEnd?: string
-  ): Promise<Array<{ docId: string; submitDateTime: string; filerName: string }>> {
+    _fiscalYearEnd?: string
+  ): Promise<Array<{ docID: string; submitDateTime: string; filerName: string; edinetCode: string }>> {
     const today = new Date();
-    const daysBack = 365; // 1年以内の有価証券報告書を検索
     const from = new Date(today);
-    from.setDate(from.getDate() - daysBack);
+    from.setDate(from.getDate() - 365);
 
-    const params = new URLSearchParams({
-      type: '2',
-      date: `${formatDate(from)}~${formatDate(today)}`,
-      docTypeList: '["2"]', // 有価証券報告書のみ
-      sort: 'descending',
-      limit: '100',
-    });
+    const headers = {
+      'Content-Type': 'application/json',
+      'Ocp-Apim-Subscription-Key': this.subscriptionKey,
+    };
 
+    // 1. Try edinetCode (most accurate)
     if (edinetCode) {
-      params.set('edinetCode', edinetCode);
-    } else if (secCode) {
-      params.set('secCode', secCode);
-    }
-
-    const url = `${this.baseUrl}/documents.json?${params}`;
-    const res = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-EDINETAPISubscriptionKey': this.subscriptionKey,
-      },
-    });
-
-    if (!res.ok) {
-      throw new Error(`EDINET API error: ${res.status}`);
-    }
-
-    const data = await res.json() as { results: Array<{ docId: string; submitDateTime: string; filerName: string; docDescription: string }> };
-    return (data.results ?? [])
-      .filter((r) => r.docDescription.includes('有価証券報告書') || r.docDescription.includes('半期報告書') || r.docDescription.includes('四半期報告書'))
-      .slice(0, 5);
-  }
-
-    for (let daysBack = searchStartDays; daysBack <= searchEndDays; daysBack++) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - daysBack);
-      const dateStr = date.toISOString().slice(0, 10);
-
-      const url = `${this.baseUrl}/documents.json?date=${dateStr}&type=2`;
-      const res = await fetch(url, {
-        headers: { 'Ocp-Apim-Subscription-Key': this.subscriptionKey },
+      const params = new URLSearchParams({
+        type: '2',
+        date: `${formatDate(from)}~${formatDate(today)}`,
+        docTypeList: '["2","3"]',
+        sort: 'descending',
+        limit: '100',
       });
+      params.set('edinetCode', edinetCode);
+      const url = `${this.baseUrl}/documents.json?${params}`;
+      const res = await fetch(url, { headers });
+      if (res.ok) {
+        const data = await res.json() as { results: Array<{ docID: string; submitDateTime: string; filerName: string; docDescription: string; edinetCode: string }> };
+        const reports = (data.results ?? []).filter((r) => {
+          const d = r.docDescription || '';
+          return d.includes('有価証券報告書') || d.includes('半期報告書') || d.includes('四半期報告書');
+        });
+        if (reports.length > 0) return reports.slice(0, 5);
+      }
+    }
 
-      if (!res.ok) continue;
-
-      const data = await res.json() as { results: Array<{ docID: string; submitDateTime: string; filerName: string; secCode: string; edinetCode: string; docDescription: string }> };
-      
-      for (const doc of data.results || []) {
-        // 有価証券報告書のみを対象（内部統制報告書などは除外）
-        const isYukashoken = doc.docDescription?.includes('有価証券報告書');
-        if (!isYukashoken) continue;
-        
-        const matchEdinet = edinetCode && doc.edinetCode === edinetCode;
-        const matchSecCode = doc.secCode === secCode || doc.secCode === secCodeNormalized;
-        const matchName = companyName && doc.filerName?.includes(companyName);
-
-        if (matchEdinet || matchSecCode || matchName) {
-          results.push({
-            docId: doc.docID,
-            submitDateTime: doc.submitDateTime,
-            filerName: doc.filerName,
+    // 2. Try secCode (unreliable but worth trying)
+    if (secCode) {
+      const secCode4 = secCode.replace(/0$/, ''); // 5桁→4桁
+      for (const code of [secCode, secCode4]) {
+        const params = new URLSearchParams({
+          type: '2',
+          date: `${formatDate(from)}~${formatDate(today)}`,
+          docTypeList: '["2","3"]',
+          sort: 'descending',
+          limit: '100',
+        });
+        params.set('secCode', code);
+        const url = `${this.baseUrl}/documents.json?${params}`;
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          const data = await res.json() as { results: Array<{ docID: string; submitDateTime: string; filerName: string; docDescription: string; edinetCode: string }> };
+          const reports = (data.results ?? []).filter((r) => {
+            const d = r.docDescription || '';
+            return d.includes('有価証券報告書') || d.includes('半期報告書') || d.includes('四半期報告書');
           });
+          if (reports.length > 0) return reports.slice(0, 5);
         }
       }
-
-      if (results.length > 0) break;
-      await sleep(1000);
     }
 
-    return results.sort((a, b) => b.submitDateTime.localeCompare(a.submitDateTime));
+    // 3. Try filerName (partial match via API parameter)
+    if (companyName) {
+      const params = new URLSearchParams({
+        type: '2',
+        date: `${formatDate(from)}~${formatDate(today)}`,
+        docTypeList: '["2","3"]',
+        sort: 'descending',
+        limit: '100',
+      });
+      params.set('filerName', companyName);
+      const url = `${this.baseUrl}/documents.json?${params}`;
+      const res = await fetch(url, { headers });
+      if (res.ok) {
+        const data = await res.json() as { results: Array<{ docID: string; submitDateTime: string; filerName: string; docDescription: string; edinetCode: string }> };
+        const reports = (data.results ?? []).filter((r) => {
+          const d = r.docDescription || '';
+          return d.includes('有価証券報告書') || d.includes('半期報告書') || d.includes('四半期報告書');
+        });
+        if (reports.length > 0) return reports.slice(0, 5);
+      }
+    }
+
+    // 4. Broad search + post-filter by company name
+    if (companyName) {
+      const params = new URLSearchParams({
+        type: '2',
+        date: `${formatDate(from)}~${formatDate(today)}`,
+        docTypeList: '["2","3"]',
+        sort: 'descending',
+        limit: '100',
+      });
+      const url = `${this.baseUrl}/documents.json?${params}`;
+      const res = await fetch(url, { headers });
+      if (res.ok) {
+        const data = await res.json() as { results: Array<{ docID: string; submitDateTime: string; filerName: string; docDescription: string; edinetCode: string }> };
+        const normalized = normalizeCompanyName(companyName);
+        const reports = (data.results ?? []).filter((r) => {
+          const d = r.docDescription || '';
+          if (!d.includes('有価証券報告書') && !d.includes('半期報告書') && !d.includes('四半期報告書')) return false;
+          const filerNorm = normalizeCompanyName(r.filerName || '');
+          return filerNorm.includes(normalized) || normalized.includes(filerNorm);
+        });
+        if (reports.length > 0) return reports.slice(0, 5);
+      }
+    }
+
+    return [];
   }
 
   async fetchDocumentText(docId: string): Promise<string> {
@@ -501,6 +523,13 @@ async function runScreening(): Promise<PickResult[]> {
   });
   console.log(`Target: ${targetSymbols.length} TSE Growth stocks`);
 
+  // Build edinetCode map from v2 API response (v1 endpoint returns 403)
+  const edinetCodeMap = new Map<string, string>();
+  for (const s of symbols) {
+    if (s.EdinetCode) edinetCodeMap.set(s.Code, s.EdinetCode);
+  }
+  console.log(`EdinetCode map: ${edinetCodeMap.size} entries`);
+
   // バッチ処理: 1日50銘柄ずつ、6日で全銘柄カバー
   const BATCH_SIZE = 50;
   const today = new Date();
@@ -531,15 +560,15 @@ async function runScreening(): Promise<PickResult[]> {
     }
 
     try {
-      await sleep(25000); // J-Quants rate limit: 3 req/min
+      await sleep(3000); // J-Quants rate limit: ~50 req/min
       let statements = await jquants.fetchStatements(sym.Code);
 
       if (statements.length === 0) {
         console.log(`J-Quants 403 for ${sym.Code}, trying EDINET fallback...`);
-        const edinetCode = await jquants.fetchEdinetCode(sym.Code);
+        const edinetCode = edinetCodeMap.get(sym.Code) || sym.EdinetCode;
         const reports = await edinet.fetchLatestYukashokenReports(sym.Code, sym.CoName, edinetCode);
         if (reports.length > 0) {
-          const xbrlText = await edinet.fetchDocumentText(reports[0].docId);
+          const xbrlText = await edinet.fetchDocumentText(reports[0].docID);
           const fin = edinet.extractFinancialData(xbrlText);
           if (fin) {
             statements = [{
@@ -624,14 +653,14 @@ async function runScreening(): Promise<PickResult[]> {
 
   for (const stock of screened) {
     try {
-      const edinetCode = await jquants.fetchEdinetCode(stock.code);
+      const edinetCode = edinetCodeMap.get(stock.code);
       const reports = await edinet.fetchLatestYukashokenReports(stock.code, stock.name, edinetCode, stock.fiscalYearEnd);
       if (reports.length === 0) {
         console.log(`Skip ${stock.code}: no EDINET reports`);
         continue;
       }
 
-      const docText = await edinet.fetchDocumentText(reports[0].docId);
+      const docText = await edinet.fetchDocumentText(reports[0].docID);
       const evalResult = await openrouter.evaluateCompany(docText);
       evaluated.push({ stock, eval: evalResult });
       console.log(`Evaluated ${stock.code}: owner=${evalResult.is_owner_company}, score=${evalResult.management_score}`);

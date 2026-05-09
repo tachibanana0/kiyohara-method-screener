@@ -137,7 +137,7 @@ export class JQuantsClient {
           const mapping = db ? await db.getEdinetMapping(sym.Code) : null;
           const reports = await edinetClient.fetchLatestYukashokenReports(sym.Code, sym.CoName, mapping?.edinet_code);
           if (reports.length > 0) {
-            const xbrlText = await edinetClient.fetchDocumentText(reports[0].docId);
+            const xbrlText = await edinetClient.fetchDocumentText(reports[0].docID);
             const fin = edinetClient.extractFinancialData(xbrlText);
             if (fin) {
               statements = [{
@@ -235,7 +235,7 @@ export class JQuantsClient {
     return total / (values.length - 1);
   }
 
-  private sleep(ms: number): Promise<void> {
+  sleep(ms: number): Promise<void> {
     return new Promise((r) => setTimeout(r, ms));
   }
 }

@@ -87,8 +87,9 @@ export class YahooFinanceClient {
     
     // Fallback: if quote data is empty, use regularMarketPrice from meta
     if (!close || isNaN(close)) {
-      close = result.meta.regularMarketPrice;
-      if (!close || isNaN(close)) return null;
+      const fallbackClose = result.meta.regularMarketPrice;
+      if (fallbackClose == null || isNaN(fallbackClose)) return null;
+      close = fallbackClose;
       
       return {
         code,

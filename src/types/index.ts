@@ -15,18 +15,12 @@ export interface JQuantsSymbol {
 
 /** J-Quants API V2: 財務データ（レスポンスは文字列のため、変換が必要） */
 export interface JQuantsStatement {
-  Code: string;
   CurPerEn: string; // YYYY-MM-DD
-  CurFYSt: string;
-  CurFYEn: string;
-  Sales: number | string;           // 売上高
-  OP: number | string;              // 営業利益
-  OdP: number | string;             // 経常利益
-  NP: number | string;              // 当期純利益
-  TA: number | string;              // 総資産
-  Eq: number | string;              // 純資産
-  CashEq: number | string;          // 現金及び預金
-  ShOutFY: number | string;         // 発行済株式数
+  Sales: number;                  // 売上高
+  OP: number;                     // 営業利益
+  NP: number;                     // 当期純利益
+  CashEq: number;                 // 現金及び預金
+  ShOutFY: number;                // 発行済株式数
 }
 
 /** J-Quants API V2: 株価情報 */

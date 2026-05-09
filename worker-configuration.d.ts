@@ -8,9 +8,13 @@ declare namespace Cloudflare {
 	interface Env {
 		DB: D1Database;
 		APP_URL: "https://kiyohara-screener.hikakunavi360.com";
-		JQUANTS_API_BASE: "https://api.jquants.com/v1";
+		JQUANTS_API_BASE: "https://api.jquants.com/v2";
 		EDINET_API_BASE: "https://disclosure.edinet-fsa.go.jp/api/v2";
 		OPENROUTER_API_BASE: "https://openrouter.ai/api/v1";
+		JQUANTS_API_KEY: string;
+		EDINET_SUBSCRIPTION_KEY: string;
+		OPENROUTER_API_KEY: string;
+		SCREENING_API_TOKEN: string;
 		SCREENING_WORKFLOW: Workflow<Parameters<import("./src/index").ScreeningWorkflow['run']>[0]['payload']>;
 		ALPHA_TRACKING_WORKFLOW: Workflow<Parameters<import("./src/index").AlphaTrackingWorkflow['run']>[0]['payload']>;
 	}
