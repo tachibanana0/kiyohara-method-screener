@@ -7,6 +7,14 @@ on:
         description: 'Number of stocks to process'
         required: false
         default: '3'
+      max_market_cap:
+        description: 'Max market cap in 億円'
+        required: false
+        default: '500'
+      max_per:
+        description: 'Max real PER'
+        required: false
+        default: '15'
 
 permissions:
   contents: read
@@ -29,4 +37,6 @@ jobs:
           SCREENING_API_URL: ${{ secrets.SCREENING_API_URL }}
           SCREENING_API_TOKEN: ${{ secrets.SCREENING_API_TOKEN }}
           BATCH_SIZE: ${{ inputs.batch_size }}
+          MAX_MARKET_CAP: ${{ inputs.max_market_cap }}
+          MAX_PER: ${{ inputs.max_per }}
         run: npx tsx scripts/screening.ts
