@@ -42,28 +42,36 @@ async function testEdinet() {
     const zip = await JSZip.loadAsync(buffer);
     const files = Object.keys(zip.files).filter((f) => !f.includes('__MACOSX'));
     console.log(`Files in ZIP: ${files.length}`);
-    
-    const xbrlFiles = files.filter((f) => f.endsWith('.xbrl') || f.endsWith('.xml'));
-    console.log(`XBRL/XML files: ${xbrlFiles.length}`);
-    for (const f of xbrlFiles.slice(0, 5)) {
+    for (const f of files) {
       console.log(`  - ${f}`);
     }
     
-    if (xbrlFiles.length > 0) {
-      const content = await zip.files[xbrlFiles[0]].async('text');
-      console.log(`\nFirst XBRL file size: ${(content.length / 1024).toFixed(1)} KB`);
+    const xbrlFiles = files.filter((f) => f.endsWith('.xbrl'));
+    const xmlFiles = files.filter((f) => f.endsWith('.xml'));
+    console.log(`\n.xbrl files: ${xbrlFiles.length}`);
+    for (const f of xbrlFiles) console.log(`  - ${f}`);
+    console.log(`\n.xml files: ${xmlFiles.length}`);
+    for (const f of xmlFiles.slice(0, 5)) console.log(`  - ${f}`);
+    
+    // Try .xbrl first, then .xml
+    const targetFiles = xbrlFiles.length > 0 ? xbrlFiles : xmlFiles;
+    
+    if (targetFiles.length > 0) {
+      const content = await zip.files[targetFiles[0]].async('text');
+      console.log(`\nFirst file size: ${(content.length / 1024).toFixed(1)} KB`);
+      console.log(`Preview (first 2000 chars):\n${content.slice(0, 2000)}`);
       
-      // Extract relevant sections
+      // Extract relevant sections with broader patterns
       const sections: string[] = [];
       const patterns = [
-        { name: '役員', regex: /<[^>]*?(Officers|Directors|Executive).*?>([\s\S]*?)<\/[^>]*?(Officers|Directors|Executive).*?>/i },
-        { name: '大株主', regex: /<[^>]*?(MajorShareholders).*?>([\s\S]*?)<\/[^>]*?(MajorShareholders).*?>/i },
-        { name: '経営環境', regex: /<[^>]*?(BusinessRisks|ManagementPolicy).*?>([\s\S]*?)<\/[^>]*?(BusinessRisks|ManagementPolicy).*?>/i },
-        { name: '業績', regex: /<[^>]*?(OperatingResults|BusinessResults).*?>([\s\S]*?)<\/[^>]*?(OperatingResults|BusinessResults).*?>/i },
+        { name: '役員', regex: /(?:役員|Officer|Director)[^<]{0,100}(?:の状況|Status)/i },
+        { name: '大株主', regex: /(?:大株主|MajorShareholder)/i },
+        { name: '経営環境', regex: /(?:経営環境|BusinessRisk|対処すべき課題)/i },
+        { name: '業績', regex: /(?:業績|OperatingResults|BusinessResults|事業の状況)/i },
       ];
       
       for (const p of patterns) {
-        const match = content.match(p.regex);
+        const match = content.match(new RegExp(`.{0,200}${p.regex.source}.{0,500}`, 'is'));
         if (match) {
           sections.push(`【${p.name}】\n${match[0].slice(0, 500)}`);
           console.log(`\n${p.name}: Found (${match[0].length} chars)`);
