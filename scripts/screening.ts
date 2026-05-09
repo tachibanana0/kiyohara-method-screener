@@ -39,6 +39,7 @@ interface QuantScreenedStock {
   profitGrowth3Y: number;
   latestPrice: number;
   latestTopix: number;
+  fiscalYearEnd: string;
 }
 
 interface LlmEvaluation {
@@ -231,14 +232,38 @@ class EdinetClient {
   async fetchLatestYukashokenReports(
     secCode: string,
     companyName?: string,
-    edinetCode?: string
+    edinetCode?: string,
+    fiscalYearEnd?: string
   ): Promise<Array<{ docId: string; submitDateTime: string; filerName: string }>> {
     const today = new Date();
     const results: Array<{ docId: string; submitDateTime: string; filerName: string }> = [];
     // secCodeの正規化: 末尾の0を除外した4桁コードも試す
     const secCodeNormalized = secCode.replace(/0$/, '');
 
-    for (let daysBack = 0; daysBack < 120; daysBack++) {
+    // 決算期から検索期間を計算（決算後3ヶ月+余裕30日）
+    let searchStartDays: number;
+    let searchEndDays: number;
+    if (fiscalYearEnd) {
+      const fyEnd = new Date(fiscalYearEnd);
+      const filingDeadline = new Date(fyEnd);
+      filingDeadline.setMonth(filingDeadline.getMonth() + 3);
+      const searchEnd = new Date(filingDeadline);
+      searchEnd.setDate(searchEnd.getDate() + 30); // 余裕30日
+
+      const todayTime = today.getTime();
+      const fyEndTime = fyEnd.getTime();
+      const searchEndTime = searchEnd.getTime();
+
+      searchStartDays = Math.max(0, Math.floor((todayTime - searchEndTime) / (1000 * 60 * 60 * 24)));
+      searchEndDays = Math.max(60, Math.floor((todayTime - fyEndTime) / (1000 * 60 * 60 * 24)));
+
+      console.log(`EDINET search window: fiscalYearEnd=${fiscalYearEnd}, searchDays=${searchStartDays}-${searchEndDays}`);
+    } else {
+      searchStartDays = 0;
+      searchEndDays = 120;
+    }
+
+    for (let daysBack = searchStartDays; daysBack <= searchEndDays; daysBack++) {
       const date = new Date(today);
       date.setDate(date.getDate() - daysBack);
       const dateStr = date.toISOString().slice(0, 10);
@@ -552,6 +577,7 @@ async function runScreening(): Promise<PickResult[]> {
         profitGrowth3Y: profitGrowth,
         latestPrice: priceData.close,
         latestTopix: topix ?? 0,
+        fiscalYearEnd: latest.CurPerEn,
       });
 
       console.log(`PASS: ${sym.Code} ${sym.CoName} cap=${marketCap.toFixed(1)}B PER=${realPER.toFixed(1)}`);
@@ -567,7 +593,7 @@ async function runScreening(): Promise<PickResult[]> {
 
   for (const stock of screened) {
     try {
-      const reports = await edinet.fetchLatestYukashokenReports(stock.code, stock.name);
+      const reports = await edinet.fetchLatestYukashokenReports(stock.code, stock.name, undefined, stock.fiscalYearEnd);
       if (reports.length === 0) {
         console.log(`Skip ${stock.code}: no EDINET reports`);
         continue;
