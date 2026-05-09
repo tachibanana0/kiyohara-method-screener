@@ -4,6 +4,8 @@
  * 使い方: npx tsx scripts/debug-edinet.ts [docId]
  */
 
+import JSZip from 'jszip';
+
 const docId = process.argv[2] || 'S100Q4XB';
 const subscriptionKey = process.env.EDINET_SUBSCRIPTION_KEY;
 
@@ -15,76 +17,72 @@ if (!subscriptionKey) {
 async function testEdinet() {
   const baseUrl = 'https://disclosure.edinet-fsa.go.jp/api/v2';
   
-  // Test 1: Document list
-  console.log('=== Test 1: Document List ===');
-  const listUrl = `${baseUrl}/documents.json?date=2025-06-28&type=2`;
-  console.log(`URL: ${listUrl}`);
-  
-  const listRes = await fetch(listUrl, {
-    headers: { 'Ocp-Apim-Subscription-Key': subscriptionKey },
-  });
-  console.log(`Status: ${listRes.status}`);
-  console.log(`Content-Type: ${listRes.headers.get('content-type')}`);
-  
-  if (listRes.ok) {
-    const listData = await listRes.json();
-    const results = listData.results || [];
-    console.log(`Results: ${results.length}`);
-    if (results.length > 0) {
-      const r = results[0];
-      console.log(`Sample: docID=${r.docID}, secCode=${r.secCode}, edinetCode=${r.edinetCode}`);
-    }
-  } else {
-    const text = await listRes.text();
-    console.log(`Error: ${text.slice(0, 200)}`);
-  }
-
-  // Test 2: Document retrieval
-  console.log('\n=== Test 2: Document Retrieval ===');
-  const docUrl = `${baseUrl}/documents/${docId}`;
+  // Test: Document retrieval with ZIP extraction
+  console.log('=== Test: Document Retrieval with ZIP Extraction ===');
+  const docUrl = `${baseUrl}/documents/${docId}?type=1`;
   console.log(`URL: ${docUrl}`);
   
   try {
-    const docRes = await fetch(docUrl, {
+    const res = await fetch(docUrl, {
       headers: { 'Ocp-Apim-Subscription-Key': subscriptionKey },
-      redirect: 'manual',
     });
-    console.log(`Status: ${docRes.status}`);
-    console.log(`Content-Type: ${docRes.headers.get('content-type')}`);
-    console.log(`Location: ${docRes.headers.get('location')}`);
     
-    if (docRes.status >= 300 && docRes.status < 400) {
-      console.log('Redirect detected!');
-    } else if (docRes.ok) {
-      const text = await docRes.text();
-      console.log(`Response length: ${text.length} chars`);
-      console.log(`Preview: ${text.slice(0, 500)}`);
-    } else {
-      const text = await docRes.text();
+    console.log(`Status: ${res.status}`);
+    console.log(`Content-Type: ${res.headers.get('content-type')}`);
+    
+    if (!res.ok) {
+      const text = await res.text();
       console.log(`Error: ${text.slice(0, 200)}`);
+      return;
+    }
+    
+    const buffer = await res.arrayBuffer();
+    console.log(`ZIP size: ${(buffer.byteLength / 1024).toFixed(1)} KB`);
+    
+    const zip = await JSZip.loadAsync(buffer);
+    const files = Object.keys(zip.files).filter((f) => !f.includes('__MACOSX'));
+    console.log(`Files in ZIP: ${files.length}`);
+    
+    const xbrlFiles = files.filter((f) => f.endsWith('.xbrl') || f.endsWith('.xml'));
+    console.log(`XBRL/XML files: ${xbrlFiles.length}`);
+    for (const f of xbrlFiles.slice(0, 5)) {
+      console.log(`  - ${f}`);
+    }
+    
+    if (xbrlFiles.length > 0) {
+      const content = await zip.files[xbrlFiles[0]].async('text');
+      console.log(`\nFirst XBRL file size: ${(content.length / 1024).toFixed(1)} KB`);
+      
+      // Extract relevant sections
+      const sections: string[] = [];
+      const patterns = [
+        { name: '役員', regex: /<[^>]*?(Officers|Directors|Executive).*?>([\s\S]*?)<\/[^>]*?(Officers|Directors|Executive).*?>/i },
+        { name: '大株主', regex: /<[^>]*?(MajorShareholders).*?>([\s\S]*?)<\/[^>]*?(MajorShareholders).*?>/i },
+        { name: '経営環境', regex: /<[^>]*?(BusinessRisks|ManagementPolicy).*?>([\s\S]*?)<\/[^>]*?(BusinessRisks|ManagementPolicy).*?>/i },
+        { name: '業績', regex: /<[^>]*?(OperatingResults|BusinessResults).*?>([\s\S]*?)<\/[^>]*?(OperatingResults|BusinessResults).*?>/i },
+      ];
+      
+      for (const p of patterns) {
+        const match = content.match(p.regex);
+        if (match) {
+          sections.push(`【${p.name}】\n${match[0].slice(0, 500)}`);
+          console.log(`\n${p.name}: Found (${match[0].length} chars)`);
+        } else {
+          console.log(`\n${p.name}: Not found`);
+        }
+      }
+      
+      console.log(`\nExtracted sections: ${sections.length}`);
+      if (sections.length > 0) {
+        console.log('--- Preview ---');
+        console.log(sections.join('\n\n').slice(0, 1000));
+      }
     }
   } catch (err: any) {
     console.error(`Error: ${err.message}`);
     if (err.cause) {
       console.error(`Cause: ${err.cause.message || err.cause}`);
     }
-  }
-
-  // Test 3: Document with type=1
-  console.log('\n=== Test 3: Document with type=1 ===');
-  const docUrlType1 = `${baseUrl}/documents/${docId}?type=1`;
-  console.log(`URL: ${docUrlType1}`);
-  
-  try {
-    const docRes = await fetch(docUrlType1, {
-      headers: { 'Ocp-Apim-Subscription-Key': subscriptionKey },
-      redirect: 'manual',
-    });
-    console.log(`Status: ${docRes.status}`);
-    console.log(`Content-Type: ${docRes.headers.get('content-type')}`);
-    console.log(`Location: ${docRes.headers.get('location')}`);
-  } catch (err: any) {
-    console.error(`Error: ${err.message}`);
   }
 }
 
