@@ -1,0 +1,31 @@
+name: Debug EDINET Search
+
+on:
+  workflow_dispatch:
+    inputs:
+      secCode:
+        description: 'Securities code to search for'
+        required: true
+        default: '29810'
+      companyName:
+        description: 'Company name (optional)'
+        required: false
+        default: ''
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install
+
+      - name: Run EDINET Search Debug
+        env:
+          EDINET_SUBSCRIPTION_KEY: ${{ secrets.EDINET_SUBSCRIPTION_KEY }}
+        run: npx tsx scripts/debug-edinet-search.ts "${{ github.event.inputs.secCode }}" "${{ github.event.inputs.companyName }}"
