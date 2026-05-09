@@ -317,7 +317,6 @@ class EdinetClient {
     
     return texts.join('\n---\n').slice(0, 50000);
   }
-  }
 
   extractFinancialData(xbrlText: string): {
     sales: number;
