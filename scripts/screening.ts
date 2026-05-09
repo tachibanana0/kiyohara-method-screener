@@ -240,9 +240,13 @@ class EdinetClient {
 
       if (!res.ok) continue;
 
-      const data = await res.json() as { results: Array<{ docID: string; submitDateTime: string; filerName: string; secCode: string; edinetCode: string }> };
+      const data = await res.json() as { results: Array<{ docID: string; submitDateTime: string; filerName: string; secCode: string; edinetCode: string; docDescription: string }> };
       
       for (const doc of data.results || []) {
+        // 有価証券報告書のみを対象（内部統制報告書などは除外）
+        const isYukashoken = doc.docDescription?.includes('有価証券報告書');
+        if (!isYukashoken) continue;
+        
         const matchEdinet = edinetCode && doc.edinetCode === edinetCode;
         const matchSecCode = doc.secCode === secCode;
         const matchName = companyName && doc.filerName?.includes(companyName);
