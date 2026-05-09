@@ -18,6 +18,7 @@ interface JQuantsSymbol {
   Code: string;
   CoName: string;
   Mkt: string;
+  EdinetCode?: string;
 }
 
 interface JQuantsStatement {
@@ -112,6 +113,26 @@ class JQuantsClient {
   async fetchAllSymbols(): Promise<JQuantsSymbol[]> {
     const data = await this.fetchJson<{ data: JQuantsSymbol[] }>('/equities/master');
     return data.data || [];
+  }
+
+  async fetchEdinetCode(code: string): Promise<string | null> {
+    try {
+      const url = `https://api.jquants.com/v1/listed?code=${code}`;
+      const res = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.apiKey,
+        },
+      });
+      if (!res.ok) return null;
+      const data = await res.json() as { info: Array<{ Code: string; EdinetCode: string }> };
+      if (data.info && data.info.length > 0) {
+        return data.info[0].EdinetCode || null;
+      }
+    } catch (err) {
+      console.warn(`Failed to fetch edinetCode for ${code}:`, err);
+    }
+    return null;
   }
 
   async fetchStatements(code: string, retries = 2): Promise<JQuantsStatement[]> {
@@ -506,7 +527,8 @@ async function runScreening(): Promise<PickResult[]> {
 
       if (statements.length === 0) {
         console.log(`J-Quants 403 for ${sym.Code}, trying EDINET fallback...`);
-        const reports = await edinet.fetchLatestYukashokenReports(sym.Code, sym.CoName);
+        const edinetCode = await jquants.fetchEdinetCode(sym.Code);
+        const reports = await edinet.fetchLatestYukashokenReports(sym.Code, sym.CoName, edinetCode);
         if (reports.length > 0) {
           const xbrlText = await edinet.fetchDocumentText(reports[0].docId);
           const fin = edinet.extractFinancialData(xbrlText);
@@ -593,7 +615,8 @@ async function runScreening(): Promise<PickResult[]> {
 
   for (const stock of screened) {
     try {
-      const reports = await edinet.fetchLatestYukashokenReports(stock.code, stock.name, undefined, stock.fiscalYearEnd);
+      const edinetCode = await jquants.fetchEdinetCode(stock.code);
+      const reports = await edinet.fetchLatestYukashokenReports(stock.code, stock.name, edinetCode, stock.fiscalYearEnd);
       if (reports.length === 0) {
         console.log(`Skip ${stock.code}: no EDINET reports`);
         continue;
