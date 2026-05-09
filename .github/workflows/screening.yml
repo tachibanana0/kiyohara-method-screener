@@ -19,6 +19,8 @@ jobs:
         with:
           node-version: '20'
 
+      - run: npm install
+
       - name: Run Screening
         env:
           JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
