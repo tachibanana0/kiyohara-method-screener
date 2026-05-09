@@ -20,55 +20,65 @@ async function main() {
 
   console.log('=== Debug EDINET for 21730 博展 ===');
   
-  // 1. Try secCode=21730
-  console.log('\n1. Search by secCode=21730');
-  const p1 = new URLSearchParams({ type: '2', date: `${formatDate(from)}~${formatDate(today)}`, docTypeList: '["2","3"]', sort: 'descending', limit: '5' });
-  p1.set('secCode', '21730');
+  // 1. Try SECCODE=21730
+  console.log('\n1. Search by SECCODE=21730');
+  const p1 = new URLSearchParams({ type: '2', date: formatDate(from), limit: '10' });
+  p1.set('SECCODE', '21730');
   const r1 = await fetch(`${baseUrl}/documents.json?${p1}`, { headers });
-  const d1 = await r1.json() as any;
-  console.log(`Status: ${r1.status}, Results: ${d1.results?.length || 0}`);
-  if (d1.results?.length > 0) {
-    for (const r of d1.results.slice(0, 3)) {
-      console.log(`  docID=${r.docID} edinetCode=${r.edinetCode} filerName=${r.filerName} desc=${r.docDescription}`);
+  console.log(`Status: ${r1.status}`);
+  if (!r1.ok) { console.log(`  Body: ${(await r1.text()).slice(0, 200)}`); }
+  else {
+    const d1 = await r1.json() as any;
+    console.log(`  Results: ${d1.results?.length || 0}`);
+    for (const r of (d1.results || []).slice(0, 3)) {
+      console.log(`  docID=${r.docID} edinetCode=${r.edinetCode} filerName=${r.filerName} desc=${r.docDescription?.slice(0, 40)}`);
     }
   }
 
-  // 2. Try secCode=2173
-  console.log('\n2. Search by secCode=2173');
-  const p2 = new URLSearchParams({ type: '2', date: `${formatDate(from)}~${formatDate(today)}`, docTypeList: '["2","3"]', sort: 'descending', limit: '5' });
-  p2.set('secCode', '2173');
+  // 2. Try SECCODE=2173
+  console.log('\n2. Search by SECCODE=2173');
+  const p2 = new URLSearchParams({ type: '2', date: formatDate(from), limit: '10' });
+  p2.set('SECCODE', '2173');
   const r2 = await fetch(`${baseUrl}/documents.json?${p2}`, { headers });
-  const d2 = await r2.json() as any;
-  console.log(`Status: ${r2.status}, Results: ${d2.results?.length || 0}`);
-  if (d2.results?.length > 0) {
-    for (const r of d2.results.slice(0, 3)) {
-      console.log(`  docID=${r.docID} edinetCode=${r.edinetCode} filerName=${r.filerName} desc=${r.docDescription}`);
+  console.log(`Status: ${r2.status}`);
+  if (!r2.ok) { console.log(`  Body: ${(await r2.text()).slice(0, 200)}`); }
+  else {
+    const d2 = await r2.json() as any;
+    console.log(`  Results: ${d2.results?.length || 0}`);
+    for (const r of (d2.results || []).slice(0, 3)) {
+      console.log(`  docID=${r.docID} edinetCode=${r.edinetCode} filerName=${r.filerName} desc=${r.docDescription?.slice(0, 40)}`);
     }
   }
 
-  // 3. Try filerName=博展
-  console.log('\n3. Search by filerName=博展');
-  const p3 = new URLSearchParams({ type: '2', date: `${formatDate(from)}~${formatDate(today)}`, docTypeList: '["2","3"]', sort: 'descending', limit: '5' });
-  p3.set('filerName', '博展');
+  // 3. Try date range with type=2 only
+  console.log('\n3. Search date range, type=2');
+  const p3 = new URLSearchParams({ type: '2', date: `${formatDate(from)}~${formatDate(today)}`, limit: '5' });
   const r3 = await fetch(`${baseUrl}/documents.json?${p3}`, { headers });
-  const d3 = await r3.json() as any;
-  console.log(`Status: ${r3.status}, Results: ${d3.results?.length || 0}`);
-  if (d3.results?.length > 0) {
-    for (const r of d3.results.slice(0, 3)) {
-      console.log(`  docID=${r.docID} edinetCode=${r.edinetCode} filerName=${r.filerName} desc=${r.docDescription}`);
+  console.log(`Status: ${r3.status}`);
+  if (!r3.ok) { console.log(`  Body: ${(await r3.text()).slice(0, 200)}`); }
+  else {
+    const d3 = await r3.json() as any;
+    console.log(`  Results: ${d3.results?.length || 0}`);
+    // Filter for 博展
+    const hakuten = (d3.results || []).filter((r: any) => r.filerName?.includes('博展'));
+    console.log(`  博展 matches: ${hakuten.length}`);
+    for (const r of hakuten.slice(0, 3)) {
+      console.log(`  docID=${r.docID} edinetCode=${r.edinetCode} filerName=${r.filerName} desc=${r.docDescription?.slice(0, 40)}`);
     }
   }
 
-  // 4. Try filerName=博展 (encoded)
-  console.log('\n4. Search by filerName=博展 (full name with 株式会社)');
-  const p4 = new URLSearchParams({ type: '2', date: `${formatDate(from)}~${formatDate(today)}`, docTypeList: '["2","3"]', sort: 'descending', limit: '5' });
-  p4.set('filerName', '株式会社博展');
+  // 4. Try edinetCode=E02143
+  console.log('\n4. Search by edinetCode=E02143');
+  const p4 = new URLSearchParams({ type: '2', date: formatDate(from), limit: '10' });
+  p4.set('edinetCode', 'E02143');
   const r4 = await fetch(`${baseUrl}/documents.json?${p4}`, { headers });
-  const d4 = await r4.json() as any;
-  console.log(`Status: ${r4.status}, Results: ${d4.results?.length || 0}`);
-  if (d4.results?.length > 0) {
-    for (const r of d4.results.slice(0, 3)) {
-      console.log(`  docID=${r.docID} edinetCode=${r.edinetCode} filerName=${r.filerName} desc=${r.docDescription}`);
+  console.log(`Status: ${r4.status}`);
+  if (!r4.ok) { console.log(`  Body: ${(await r4.text()).slice(0, 200)}`); }
+  else {
+    const d4 = await r4.json() as any;
+    console.log(`  Results: ${d4.results?.length || 0}`);
+    for (const r of (d4.results || []).slice(0, 3)) {
+      console.log(`  docID=${r.docID} edinetCode=${r.edinetCode} filerName=${r.filerName} desc=${r.docDescription?.slice(0, 40)}`);
     }
   }
 }
