@@ -269,9 +269,16 @@ class EdinetClient {
     const namePrefix2 = normalizedName.slice(0, 2);
     const namePrefix3 = normalizedName.slice(0, 3);
 
-    // Search up to 365 days back, client-side filtering
-    // Skip by 5-day increments first, then finer search when close
-    for (let daysBack = 0; daysBack < 365; daysBack++) {
+    // 粗密探索: 直近は密に、過去は疎に
+    // Phase 1: every day for first 60 days (close matches)
+    // Phase 2: every 7 days for next 180 days (extended search)
+    // Phase 3: every 14 days beyond (rare cases)
+    const searchSteps: number[] = [];
+    for (let d = 0; d < 60; d++) searchSteps.push(d);
+    for (let d = 60; d < 240; d += 7) searchSteps.push(d);
+    for (let d = 240; d < 365; d += 14) searchSteps.push(d);
+
+    for (const daysBack of searchSteps) {
       const date = new Date(today);
       date.setDate(date.getDate() - daysBack);
       const dateStr = formatDate(date);
