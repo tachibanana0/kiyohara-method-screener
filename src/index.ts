@@ -152,6 +152,7 @@ app.post('/api/screening/receive', async (c) => {
         latestPrice: pick.latestPrice,
         latestTopix: pick.latestTopix,
         kiyoharaCompliant: pick.isKiyoharaCompliant ?? true,
+        reason: pick.reason ?? '',
       });
       saved++;
     } catch (err) {

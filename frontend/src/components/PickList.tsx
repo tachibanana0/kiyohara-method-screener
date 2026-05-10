@@ -10,6 +10,7 @@ interface Pick {
   management_score: number;
   picked_at: string;
   kiyohara_compliant: number;
+  reason: string;
 }
 
 interface Props {
@@ -55,29 +56,38 @@ export default function PickList({ picks, selected, onSelect }: Props) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/80">
-              <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted uppercase tracking-wider w-10">
+              <th className="text-left px-3 py-3 text-[11px] font-semibold text-muted uppercase tracking-wider w-8">
                 <span className="sr-only">選択</span>
               </th>
-              <th className="text-left px-4 py-3 text-[11px] font-semibold text-muted uppercase tracking-wider">
+              <th className="text-left px-3 py-3 text-[11px] font-semibold text-muted uppercase tracking-wider">
                 銘柄
               </th>
-              <th className="text-right px-4 py-3 text-[11px] font-semibold text-muted uppercase tracking-wider">
+              <th className="text-center px-3 py-3 text-[11px] font-semibold text-muted uppercase tracking-wider">
+                Tier
+              </th>
+              <th className="text-center px-3 py-3 text-[11px] font-semibold text-muted uppercase tracking-wider">
+                オーナー企業
+              </th>
+              <th className="text-right px-3 py-3 text-[11px] font-semibold text-muted uppercase tracking-wider">
                 時価総額
               </th>
-              <th className="text-right px-4 py-3 text-[11px] font-semibold text-muted uppercase tracking-wider">
+              <th className="text-right px-3 py-3 text-[11px] font-semibold text-muted uppercase tracking-wider">
                 純現金
               </th>
-              <th className="text-right px-4 py-3 text-[11px] font-semibold text-muted uppercase tracking-wider">
+              <th className="text-right px-3 py-3 text-[11px] font-semibold text-muted uppercase tracking-wider">
                 実質PER
               </th>
-              <th className="text-right px-4 py-3 text-[11px] font-semibold text-muted uppercase tracking-wider">
+              <th className="text-right px-3 py-3 text-[11px] font-semibold text-muted uppercase tracking-wider">
                 売上成長 3Y
               </th>
-              <th className="text-right px-4 py-3 text-[11px] font-semibold text-muted uppercase tracking-wider">
+              <th className="text-right px-3 py-3 text-[11px] font-semibold text-muted uppercase tracking-wider">
                 営利成長 3Y
               </th>
-              <th className="text-center px-4 py-3 text-[11px] font-semibold text-muted uppercase tracking-wider">
+               <th className="text-center px-3 py-3 text-[11px] font-semibold text-muted uppercase tracking-wider">
                 スコア
+              </th>
+              <th className="text-left px-3 py-3 text-[11px] font-semibold text-muted uppercase tracking-wider">
+                評価理由
               </th>
             </tr>
           </thead>
@@ -97,7 +107,7 @@ export default function PickList({ picks, selected, onSelect }: Props) {
                     isSel ? 'bg-amber-50/50' : isKiyohara ? 'hover:bg-green-50/30' : 'hover:bg-amber-50/20'
                   }`}
                 >
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     <div
                       className={`w-2 h-2 rounded-full transition-colors ${
                         isSel
@@ -108,37 +118,43 @@ export default function PickList({ picks, selected, onSelect }: Props) {
                       }`}
                     />
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2 min-w-[160px]">
+                  <td className="px-3 py-3">
+                    <div className="flex items-center gap-2 min-w-[150px]">
                       <span className="font-semibold text-primary tabular-nums">
                         {pick.code}
                       </span>
-                      <span className="text-gray-700">{pick.name}</span>
-                      {isKiyohara ? (
-                        <span className="text-[10px] bg-green-50 text-success font-semibold px-1.5 py-0.5 rounded">
-                          適合
-                        </span>
-                      ) : (
-                        <span className="text-[10px] bg-amber-50 text-accent font-semibold px-1.5 py-0.5 rounded">
-                          監視
-                        </span>
-                      )}
-                      {pick.is_owner_company ? (
-                        <span className="text-[10px] bg-accent/10 text-accent font-semibold px-1.5 py-0.5 rounded">
-                          オーナー
-                        </span>
-                      ) : null}
+                      <span className="text-gray-700 truncate max-w-[100px]">{pick.name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-gray-800">
+                  <td className="px-3 py-3 text-center">
+                    {isKiyohara ? (
+                      <span className="text-[10px] bg-green-50 text-success font-semibold px-1.5 py-0.5 rounded">
+                        適合
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-amber-50 text-accent font-semibold px-1.5 py-0.5 rounded">
+                        監視
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-center">
+                    {pick.is_owner_company ? (
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-50 text-success text-xs font-bold">
+                        ✓
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted/40">✗</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-right tabular-nums text-gray-800">
                     {fmt(pick.market_cap)}
                     <span className="text-xs text-muted ml-0.5">億</span>
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-gray-800">
+                  <td className="px-3 py-3 text-right tabular-nums text-gray-800">
                     {fmt(pick.net_cash)}
                     <span className="text-xs text-muted ml-0.5">億</span>
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
+                  <td className="px-3 py-3 text-right tabular-nums">
                     <span
                       className={
                         pick.real_per <= 10
@@ -152,14 +168,19 @@ export default function PickList({ picks, selected, onSelect }: Props) {
                     </span>
                     <span className="text-xs text-muted ml-0.5">倍</span>
                   </td>
-                  <td className={`px-4 py-3 text-right tabular-nums font-semibold ${sales.cls}`}>
+                  <td className={`px-3 py-3 text-right tabular-nums font-semibold ${sales.cls}`}>
                     {sales.text}
                   </td>
-                  <td className={`px-4 py-3 text-right tabular-nums font-semibold ${profit.cls}`}>
+                  <td className={`px-3 py-3 text-right tabular-nums font-semibold ${profit.cls}`}>
                     {profit.text}
                   </td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="px-3 py-3 text-center">
                     <span className={badge.cls}>{badge.label}</span>
+                  </td>
+                  <td className="px-3 py-3 max-w-[220px]">
+                    <span className="text-xs text-gray-600 line-clamp-2 leading-relaxed" title={pick.reason}>
+                      {pick.reason || '\u2014'}
+                    </span>
                   </td>
                 </tr>
               );

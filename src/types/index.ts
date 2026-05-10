@@ -105,6 +105,7 @@ export interface PickRow {
   initial_price: number | null;
   initial_topix: number | null;
   kiyohara_compliant: number;
+  reason: string;
   status: string;
 }
 

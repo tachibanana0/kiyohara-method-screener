@@ -262,6 +262,7 @@ export class ScreeningWorkflowV2 extends WorkflowEntrypoint<Env, ScreeningWorkfl
                 latestPrice: item.stock.latestPrice,
                 latestTopix: item.stock.latestTopix,
                 kiyoharaCompliant: true,
+                reason: item.eval.reason,
               });
             }
             count++;

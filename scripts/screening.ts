@@ -61,6 +61,7 @@ interface PickResult {
   latestPrice: number;
   latestTopix: number;
   isKiyoharaCompliant: boolean;
+  reason: string;
 }
 
 import JSZip from 'jszip';
@@ -230,7 +231,15 @@ function normalizeCompanyName(name: string): string {
     .replace(/株式会社/g, '')
     .replace(/（株）/g, '')
     .replace(/\(株\)/g, '')
-    .replace(/\s+/g, '')
+    .replace(/ホールディングス/g, '')
+    .replace(/ＨＤ/g, '')
+    .replace(/HD/g, '')
+    .replace(/グループ/g, '')
+    .replace(/ジャパン/g, '')
+    .replace(/Japan/gi, '')
+    .replace(/インターナショナル/g, '')
+    .replace(/International/gi, '')
+    .replace(/[\s　・]/g, '')
     .trim();
 }
 
@@ -256,37 +265,59 @@ class EdinetClient {
     };
     const secCode4 = secCode.replace(/0$/, ''); // 5桁→4桁
     const normalizedName = companyName ? normalizeCompanyName(companyName) : '';
+    // 会社名の先頭2〜3文字も取得（部分一致のフォールバック）
+    const namePrefix2 = normalizedName.slice(0, 2);
+    const namePrefix3 = normalizedName.slice(0, 3);
 
-    // Search up to 90 days back, client-side filtering
-    for (let daysBack = 0; daysBack < 90; daysBack++) {
+    // Search up to 365 days back, client-side filtering
+    // Skip by 5-day increments first, then finer search when close
+    for (let daysBack = 0; daysBack < 365; daysBack++) {
       const date = new Date(today);
       date.setDate(date.getDate() - daysBack);
       const dateStr = formatDate(date);
       const url = `${this.baseUrl}/documents.json?date=${dateStr}&type=2`;
 
-      const res = await fetch(url, { headers });
-      if (!res.ok) continue;
+      try {
+        const res = await fetch(url, { headers });
+        if (!res.ok) continue;
 
-      const data = await res.json() as { results?: Array<{ docID: string; submitDateTime: string; filerName: string; docDescription: string; edinetCode: string; secCode: string }> };
-      const results = data.results || [];
-      if (results.length === 0) continue;
+        const data = await res.json() as { results?: Array<{ docID: string; submitDateTime: string; filerName: string; docDescription: string; edinetCode: string; secCode: string }> };
+        const results = data.results || [];
+        if (results.length === 0) continue;
 
-      const reports = results.filter((r) => {
-        const d = r.docDescription || '';
-        if (!d.includes('有価証券報告書') && !d.includes('半期報告書') && !d.includes('四半期報告書')) return false;
-        // Match by edinetCode (exact)
-        if (edinetCode && r.edinetCode === edinetCode) return true;
-        // Match by secCode
-        if (r.secCode && (r.secCode === secCode || r.secCode === secCode4)) return true;
-        // Match by filerName (partial, normalized)
-        if (normalizedName && r.filerName) {
-          const filerNorm = normalizeCompanyName(r.filerName);
-          if (filerNorm.includes(normalizedName) || normalizedName.includes(filerNorm)) return true;
-        }
-        return false;
-      });
+        const reports = results.filter((r) => {
+          const d = r.docDescription || '';
+          // 有価証券報告書・半期・四半期 に加え、決算短信や有報も拾う
+          const isFinancial = d.includes('有価証券報告書') || d.includes('有報')
+            || d.includes('半期報告書') || d.includes('四半期報告書')
+            || d.includes('決算短信') || d.includes('臨時報告書');
+          if (!isFinancial) return false;
+          // Match by edinetCode (exact)
+          if (edinetCode && r.edinetCode === edinetCode) return true;
+          // Match by secCode
+          if (r.secCode && (r.secCode === secCode || r.secCode === secCode4)) return true;
+          // Match by filerName
+          if (r.filerName) {
+            const filerNorm = normalizeCompanyName(r.filerName);
+            // 完全一致
+            if (normalizedName && filerNorm === normalizedName) return true;
+            // 相互包含
+            if (normalizedName && (filerNorm.includes(normalizedName) || normalizedName.includes(filerNorm))) return true;
+            // 先頭2〜3文字一致（短い会社名対策）
+            if (namePrefix2.length >= 2 && filerNorm.startsWith(namePrefix2)) return true;
+            // EDINET filerNameが元の会社名を含むか
+            if (companyName && r.filerName.includes(companyName)) return true;
+          }
+          return false;
+        });
 
-      if (reports.length > 0) return reports.slice(0, 5);
+        if (reports.length > 0) return reports.slice(0, 5);
+      } catch {
+        // ネットワークエラーは無視して翌日へ
+      }
+
+      // 90日分のAPIコールでレート制限を避けるため適度にwait
+      if (daysBack % 10 === 9) await sleep(1000);
     }
 
     return [];
@@ -644,6 +675,7 @@ const SKIP_LOW_GROWTH = process.env.SKIP_LOW_GROWTH !== 'true'; // false by defa
         latestPrice: item.stock.latestPrice,
         latestTopix: item.stock.latestTopix,
         isKiyoharaCompliant: true,
+        reason: item.eval.reason,
       });
       pickedCodes.add(item.stock.code);
       console.log(`PICK (清原適合): ${item.stock.code} ${item.stock.name}`);
@@ -671,6 +703,7 @@ const SKIP_LOW_GROWTH = process.env.SKIP_LOW_GROWTH !== 'true'; // false by defa
         latestPrice: item.stock.latestPrice,
         latestTopix: item.stock.latestTopix,
         isKiyoharaCompliant: false,
+        reason: item.eval.reason,
       });
       console.log(`PICK (監視): ${item.stock.code} ${item.stock.name} (score=${item.eval.management_score}, PER=${item.stock.realPER.toFixed(1)}, owner=${item.eval.is_owner_company})`);
     }
