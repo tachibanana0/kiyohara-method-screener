@@ -603,7 +603,10 @@ const REQUIRE_PROFIT = process.env.REQUIRE_PROFIT !== 'false';  // true by defau
 const SKIP_LOW_GROWTH = process.env.SKIP_LOW_GROWTH !== 'true'; // false by default (don't skip)
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
-  const batchIndex = BATCH_SIZE === 50 ? (dayOfWeek - 1 + 5) % 5 : 0; // 0-4 for Mon-Fri, 0 for custom batch
+  const batchIndexFromEnv = process.env.BATCH_INDEX;
+  const batchIndex = batchIndexFromEnv != null
+    ? parseInt(batchIndexFromEnv, 10)
+    : (BATCH_SIZE === 50 ? (dayOfWeek - 1 + 5) % 5 : 0);
   const startIdx = batchIndex * BATCH_SIZE;
   const endIdx = Math.min(startIdx + BATCH_SIZE, targetSymbols.length);
   const batchSymbols = targetSymbols.slice(startIdx, endIdx);

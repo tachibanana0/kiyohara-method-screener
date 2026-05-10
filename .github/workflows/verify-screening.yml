@@ -35,6 +35,10 @@ on:
         description: 'Skip negative growth stocks (true/false)'
         required: false
         default: 'false'
+      batch_index:
+        description: 'Force batch index (0-4)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -64,4 +68,5 @@ jobs:
           WATCH_SCORE: ${{ inputs.watch_score }}
           REQUIRE_PROFIT: ${{ inputs.require_profit }}
           SKIP_LOW_GROWTH: ${{ inputs.skip_low_growth }}
+          BATCH_INDEX: ${{ inputs.batch_index }}
         run: npx tsx scripts/screening.ts
