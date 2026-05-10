@@ -208,7 +208,7 @@ class YahooFinanceClient {
   async fetchQuotes(codes: string[]): Promise<Map<string, { close: number }>> {
     const priceMap = new Map<string, { close: number }>();
     for (const code of codes) {
-      await sleep(500);
+      await sleep(100);
       const quote = await this.fetchQuote(code);
       if (quote) {
         priceMap.set(code, quote);
@@ -323,8 +323,7 @@ class EdinetClient {
         // ネットワークエラーは無視して翌日へ
       }
 
-      // 90日分のAPIコールでレート制限を避けるため適度にwait
-      if (daysBack % 10 === 9) await sleep(1000);
+      // EDINET search sleep removed for speed
     }
 
     return [];
@@ -542,33 +541,11 @@ const SKIP_LOW_GROWTH = process.env.SKIP_LOW_GROWTH !== 'true'; // false by defa
     }
 
     try {
-      await sleep(5000); // J-Quants rate limit: 3 req/min for free tier
+      await sleep(3000); // J-Quants rate limit: 3 req/min for free tier
       let statements = await jquants.fetchStatements(sym.Code);
 
       if (statements.length === 0) {
-        console.log(`J-Quants 403 for ${sym.Code}, trying EDINET fallback...`);
-        const edinetCode = edinetCodeMap.get(sym.Code) || undefined;
-        const reports = await edinet.fetchLatestYukashokenReports(sym.Code, sym.CoName, edinetCode);
-        if (reports.length > 0) {
-          // Cache edinetCode from successful EDINET search
-          if (reports[0].edinetCode) edinetCodeMap.set(sym.Code, reports[0].edinetCode);
-          const xbrlText = await edinet.fetchDocumentText(reports[0].docID);
-          const fin = edinet.extractFinancialData(xbrlText);
-          if (fin) {
-            statements = [{
-              CurPerEn: new Date().toISOString().slice(0, 10),
-              Sales: fin.sales,
-              OP: fin.operatingProfit,
-              NP: fin.netProfit,
-              CashEq: fin.cashAndDeposits,
-              ShOutFY: fin.sharesOutstanding,
-            } as JQuantsStatement];
-          }
-        }
-      }
-
-      if (statements.length === 0) {
-        console.log(`Skip ${sym.Code}: no financial data`);
+        console.log(`Skip ${sym.Code}: no J-Quants financial data`);
         continue;
       }
 
@@ -649,7 +626,7 @@ const SKIP_LOW_GROWTH = process.env.SKIP_LOW_GROWTH !== 'true'; // false by defa
       evaluated.push({ stock, eval: evalResult });
       console.log(`Evaluated ${stock.code}: owner=${evalResult.is_owner_company}, score=${evalResult.management_score}`);
       
-      await sleep(2000);
+      await sleep(500);
     } catch (err) {
       console.warn(`LLM evaluation failed for ${stock.code}:`, err);
     }
