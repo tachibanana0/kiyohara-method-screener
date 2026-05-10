@@ -202,42 +202,13 @@ export default function PerformanceChart({ code, apiBase }: Props) {
                 return [value, name];
               }}
             />
-            <Bar
-              yAxisId="yen"
-              dataKey="price"
-              fill={priceColor}
-              fillOpacity={0.12}
-              radius={[2, 2, 0, 0]}
-              maxBarSize={24}
-            />
-            <Line
-              yAxisId="pct"
-              type="monotone"
-              dataKey="stock"
-              stroke={stockColor}
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 4, fill: stockColor, stroke: '#fff', strokeWidth: 2 }}
-            />
-            <Line
-              yAxisId="pct"
-              type="monotone"
-              dataKey="topix"
-              stroke={topixColor}
-              strokeWidth={1.5}
-              dot={false}
-              strokeDasharray="4 3"
-              activeDot={{ r: 3, fill: topixColor }}
-            />
-            <Line
-              yAxisId="pct"
-              type="monotone"
-              dataKey="alpha"
-              stroke={alphaColor}
-              strokeWidth={2.5}
-              dot={false}
-              activeDot={{ r: 4, fill: alphaColor, stroke: '#fff', strokeWidth: 2 }}
-            />
+            <Bar yAxisId="yen" dataKey="price" fill={priceColor} fillOpacity={0.12} radius={[2, 2, 0, 0]} maxBarSize={24} />
+            <Line yAxisId="pct" type="monotone" dataKey="stock" stroke={stockColor} strokeWidth={2} dot={false}
+              activeDot={{ r: 4, fill: stockColor, stroke: '#fff', strokeWidth: 2 }} />
+            <Line yAxisId="pct" type="monotone" dataKey="topix" stroke={topixColor} strokeWidth={1.5} dot={false}
+              strokeDasharray="4 3" activeDot={{ r: 3, fill: topixColor }} />
+            <Line yAxisId="pct" type="monotone" dataKey="alpha" stroke={alphaColor} strokeWidth={2.5} dot={false}
+              activeDot={{ r: 4, fill: alphaColor, stroke: '#fff', strokeWidth: 2 }} />
           </ComposedChart>
         </ResponsiveContainer>
 

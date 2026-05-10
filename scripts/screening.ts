@@ -74,6 +74,78 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function extractOwnerRelevantSections(docText: string): string {
+  const MAX_LEN = 20000;
+  const sections: string[] = [];
+
+  // Priority 1: Major shareholders section (most important for ownership)
+  const shareholderPatterns = [
+    /大株主の状況[\s\S]*?(?=(?:\n\s*(?:第[一二三四五六七八九十\d]|\[|【|\(|[a-zA-Z]{2,}))|$)/,
+    /株主の状況[\s\S]*?(?=(?:\n\s*(?:第[一二三四五六七八九十\d]|\[|【|\(|[a-zA-Z]{2,}))|$)/,
+    /所有者別状況[\s\S]*?(?=(?:\n\s*(?:第[一二三四五六七八九十\d]|\[|【|\(|[a-zA-Z]{2,}))|$)/,
+    /大株主[\s\S]{0,2000}/,
+    /主要株主[\s\S]{0,2000}/,
+    /上位.*株主[\s\S]{0,2000}/,
+  ];
+  for (const pattern of shareholderPatterns) {
+    const m = docText.match(pattern);
+    if (m && m[0].length > 50) {
+      sections.push('[大株主の状況]\n' + m[0].slice(0, 5000));
+      break;
+    }
+  }
+
+  // Priority 2: Directors/officers section
+  const directorPatterns = [
+    /役員の状況[\s\S]*?(?=(?:\n\s*(?:第[一二三四五六七八九十\d]|\[|【|\(|[a-zA-Z]{2,}))|$)/,
+    /取締役[\s\S]{0,3000}/,
+    /役員一覧[\s\S]{0,3000}/,
+    /代表取締役[\s\S]{0,2000}/,
+    /執行役員[\s\S]{0,2000}/,
+  ];
+  for (const pattern of directorPatterns) {
+    const m = docText.match(pattern);
+    if (m && m[0].length > 50) {
+      sections.push('[役員の状況]\n' + m[0].slice(0, 5000));
+      break;
+    }
+  }
+
+  // Priority 3: Corporate governance section
+  const govPatterns = [
+    /コーポレートガバナンス[\s\S]*?(?=(?:\n\s*(?:第[一二三四五六七八九十\d]|\[|【|\(|[a-zA-Z]{2,}))|$)/,
+    /ガバナンス[\s\S]{0,3000}/,
+    /コーポレート・ガバナンス[\s\S]{0,3000}/,
+  ];
+  for (const pattern of govPatterns) {
+    const m = docText.match(pattern);
+    if (m && m[0].length > 50) {
+      sections.push('[コーポレートガバナンス]\n' + m[0].slice(0, 3000));
+      break;
+    }
+  }
+
+  // Priority 4: Company history (for founder info)
+  const historyPatterns = [
+    /沿革[\s\S]*?(?=(?:\n\s*(?:第[一二三四五六七八九十\d]|\[|【|\(|[a-zA-Z]{2,}))|$)/,
+    /会社.*沿革[\s\S]{0,2000}/,
+    /設立[\s\S]{0,1000}/,
+  ];
+  for (const pattern of historyPatterns) {
+    const m = docText.match(pattern);
+    if (m && m[0].length > 50) {
+      sections.push('[沿革]\n' + m[0].slice(0, 2000));
+      break;
+    }
+  }
+
+  if (sections.length === 0) {
+    return docText.slice(0, MAX_LEN);
+  }
+
+  return sections.join('\n---\n').slice(0, MAX_LEN);
+}
+
 // ============================================
 // J-Quants API クライアント
 // ============================================
@@ -416,20 +488,36 @@ class OpenRouterClient {
   }
 
   async evaluateCompany(docText: string): Promise<LlmEvaluation> {
-    const prompt = `You are a stock analyst evaluating companies using the Kiyohara Method.
+    // Extract relevant sections for owner company analysis
+    const relevantText = extractOwnerRelevantSections(docText);
 
-Evaluate the following financial report (annual, semi-annual, or quarterly) and respond with ONLY a JSON object. Do not include any explanation or text outside the JSON.
+    const prompt = `You are a stock analyst evaluating Japanese companies. You are given text extracted from a company's annual securities report (有価証券報告書) filed with EDINET.
+
+Evaluate the company and respond with ONLY a JSON object. Do not include any explanation or text outside the JSON.
 
 Criteria:
-1. is_owner_company: 1 if owner-managed (founder family, same family name as company name, etc.), 0 otherwise
-2. management_score: 1-100 (higher = better management quality)
-3. reason: Brief reason in Japanese
+1. is_owner_company: 1 if the founder or founding family still holds significant management control (CEO, Chairman, or Representative Director) AND/OR holds a large ownership stake (appears as a major shareholder with significant percentage). Look for indicators like:
+   - Founder listed as 代表取締役社長、会長、執行役員
+   - Founder/family as top shareholders (>10% stake)
+   - Company history (沿革) section referencing founder's ongoing involvement
+   - CEO personally holds a large number of shares
+   - Family members in key management positions
+   Set to 0 if the company appears to be a subsidiary, professionally managed, or if founder/family has no significant remaining stake.
+
+2. management_score: 1-100, where:
+   - 80-100: Excellent management with clear strategy, strong governance, long track record
+   - 60-80: Good management, reasonable governance, stable trajectory
+   - 40-60: Average management, no particular strengths or weaknesses
+   - 20-40: Below average, some governance concerns
+   - 1-20: Poor management, red flags
+
+3. reason: Brief reason in Japanese (2-3 sentences). For is_owner_company, cite specific evidence (e.g., founder name, shareholding percentage, family involvement). For management_score, cite specific strengths or weaknesses found in the report.
 
 Respond with ONLY this JSON format:
 {"is_owner_company": 0, "management_score": 50, "reason": "理由"}
 
-Document:
-${docText.slice(0, 8000)}`;
+Document text:
+${relevantText}`;
 
     const res = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -621,7 +709,10 @@ const SKIP_LOW_GROWTH = process.env.SKIP_LOW_GROWTH !== 'true'; // false by defa
         continue;
       }
 
-      const docText = await edinet.fetchDocumentText(reports[0].docID);
+      // Skip correction reports (訂正報告書) — don't contain management info
+      const primaryReport = reports.find((r: EdinetDocument) => !r.docDescription?.includes('訂正')) || reports[0];
+
+      const docText = await edinet.fetchDocumentText(primaryReport.docID);
       const evalResult = await openrouter.evaluateCompany(docText);
       evaluated.push({ stock, eval: evalResult });
       console.log(`Evaluated ${stock.code}: owner=${evalResult.is_owner_company}, score=${evalResult.management_score}`);
