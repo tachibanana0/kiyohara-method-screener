@@ -7,7 +7,24 @@
   --color-danger: #dc2626;
   --color-success: #16a34a;
   --color-muted: #64748b;
+  --animate-fadeInUp: fadeInUp 0.6s ease-out both;
+  --animate-fadeInUp-delay-1: fadeInUp 0.6s ease-out 0.1s both;
+  --animate-fadeInUp-delay-2: fadeInUp 0.6s ease-out 0.2s both;
+  --animate-fadeInUp-delay-3: fadeInUp 0.6s ease-out 0.3s both;
+  --animate-fadeInUp-delay-4: fadeInUp 0.6s ease-out 0.4s both;
 }
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+
+.animate-fadeInUp { animation: fadeInUp 0.6s ease-out both; }
 
 body {
   font-family: 'Noto Sans JP', 'Inter', ui-sans-serif, system-ui, sans-serif;
