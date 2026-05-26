@@ -142,7 +142,7 @@ export default function Landing() {
               このスクリーナーは清原メソッドの実践を自動化したものです。
             </p>
             <a
-              href="https://hb.afl.rakuten.co.jp/hgc/【アフィリエイトIDを入力】/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fbook%2F17770405%2F"
+              href="https://books.rakuten.co.jp/rb/17770405/"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-white/10 text-sm text-gray-300 hover:border-amber-500/30 hover:text-white transition-all"
