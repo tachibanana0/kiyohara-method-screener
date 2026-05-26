@@ -7,6 +7,7 @@ const Dashboard = lazy(() => import('./Dashboard'));
 const Method = lazy(() => import('./Method'));
 const FAQ = lazy(() => import('./FAQ'));
 const About = lazy(() => import('./About'));
+const StockDetail = lazy(() => import('./StockDetail'));
 
 function Loading() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/method" element={<Method />} />
           <Route path="/faq" element={<FAQ />} />
           <Route path="/about" element={<About />} />
+          <Route path="/picks/:code" element={<StockDetail />} />
         </Routes>
       </Suspense>
     </BrowserRouter>

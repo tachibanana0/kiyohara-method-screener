@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 interface Pick {
   code: string;
   name: string;
@@ -120,9 +122,13 @@ export default function PickList({ picks, selected, onSelect }: Props) {
                   </td>
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-2 min-w-[150px]">
-                      <span className="font-semibold text-primary tabular-nums">
+                      <Link
+                        to={`/picks/${pick.code}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="font-semibold text-primary tabular-nums hover:text-accent transition-colors"
+                      >
                         {pick.code}
-                      </span>
+                      </Link>
                       <span className="text-gray-700 truncate max-w-[100px]">{pick.name}</span>
                     </div>
                   </td>
