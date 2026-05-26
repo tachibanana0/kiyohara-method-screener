@@ -124,6 +124,35 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Method Detail */}
+      <section className="relative px-6 py-32 border-t border-white/5">
+        <div className="max-w-3xl mx-auto">
+          <span className="text-xs tracking-[0.2em] uppercase text-amber-500 font-semibold mb-6 block">清原メソッドの詳細</span>
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-8">割安小型成長株×オーナー企業で市場平均を上回る</h2>
+          <div className="space-y-6 text-sm text-gray-400 leading-relaxed">
+            <p>
+              清原メソッドは、<strong className="text-white font-semibold">時価総額の小さい成長企業</strong>の中から、
+              <strong className="text-white font-semibold">創業家が経営に関与するオーナー企業</strong>を見つけ出し、
+              長期的な超過収益を狙う投資手法です。
+            </p>
+            <p>
+              単に PER が低いだけの「割安株」ではなく、実質 PER（時価総額からネットキャッシュを差し引いた実質的な企業価値÷純利益）を用いることで、
+              財務的な安全性を加味した真の割安度を評価します。
+            </p>
+            <p>
+              さらに重要なのが<strong className="text-white font-semibold">オーナー企業</strong>という視点。
+              創業者や創業家が経営トップに立ち、大株主として株式を保有する企業は、
+              短期的な株価対策ではなく長期的な企業価値向上を目指す傾向があり、結果として株主利益と経営者の利益が一致します。
+            </p>
+            <div className="flex items-center gap-3 mt-8">
+              <Link to="/method" className="text-sm text-amber-400 hover:text-amber-300 transition-colors font-medium">
+                清原メソッドの全7基準を詳しく見る →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Book */}
       <section className="relative px-6 py-32 border-t border-white/5">
         <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
@@ -231,6 +260,31 @@ export default function Landing() {
         </section>
       )}
 
+      {/* FAQ Preview */}
+      <section className="relative px-6 py-32 border-t border-white/5">
+        <div className="max-w-3xl mx-auto">
+          <span className="text-xs tracking-[0.2em] uppercase text-amber-500 font-semibold mb-6 block">FAQ</span>
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-8">よくある質問</h2>
+          <div className="space-y-6 text-sm">
+            {[
+              { q: '清原メソッド・スクリーナーは無料ですか？', a: 'はい、完全無料です。Cloudflare / GitHub の無料枠で運用しています。' },
+              { q: 'なぜ東証グロース市場だけが対象ですか？', a: '清原メソッドが本来対象とする小型株が東証グロースに集中しているためです。' },
+              { q: 'AI の判定精度は？', a: 'EDINET 有報の大株主構成・役員経歴に基づき Gemini 2.5 Flash が判定。検証では 250 銘柄中 7 件を正しく検出しました。ただし最終投資判断はご自身で。' },
+            ].map((f, i) => (
+              <div key={i}>
+                <h3 className="font-bold text-white mb-1">{f.q}</h3>
+                <p className="text-gray-400 leading-relaxed">{f.a}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-8">
+            <Link to="/faq" className="text-sm text-amber-400 hover:text-amber-300 transition-colors font-medium">
+              すべての質問を見る →
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* CTA */}
       <section className="relative px-6 py-32 text-center">
         <div className="absolute inset-0 bg-gradient-to-t from-blue-950/30 to-transparent" />
@@ -254,6 +308,12 @@ export default function Landing() {
 
       {/* Footer */}
       <footer className="border-t border-white/5 px-6 py-8 text-center">
+        <div className="flex items-center justify-center gap-6 mb-3">
+          <Link to="/method" className="text-xs text-gray-600 hover:text-gray-400 transition-colors">清原メソッドとは</Link>
+          <Link to="/faq" className="text-xs text-gray-600 hover:text-gray-400 transition-colors">FAQ</Link>
+          <Link to="/about" className="text-xs text-gray-600 hover:text-gray-400 transition-colors">運営者情報</Link>
+          <Link to="/dashboard" className="text-xs text-gray-600 hover:text-gray-400 transition-colors">ダッシュボード</Link>
+        </div>
         <p className="text-xs text-gray-600">
           清原メソッド・スクリーナー &middot; Cloudflare Workers + D1 + GitHub Actions + OpenRouter
         </p>

@@ -122,6 +122,84 @@ app.get('/api/tracking/:code', async (c) => {
   return c.json(series);
 });
 
+// --- SEO: 個別銘柄ページ ---
+app.get('/picks/:code', async (c) => {
+  const code = c.req.param('code');
+  const db = new ScreenerDB(c.env.DB);
+  const pick = await db.getPickByCode(code);
+  if (!pick) return c.notFound();
+
+  const series = await db.getTrackingSeries(code);
+  const latestTracking = series.length > 0 ? series[series.length - 1] : null;
+  const basePrice = series.length > 0 ? series[0].price : (pick.initial_price ?? 0);
+  const firstTopix = series.length > 0 ? series[0].topix : (pick.initial_topix ?? 0);
+
+  const stockReturn = latestTracking && basePrice > 0
+    ? ((latestTracking.price / basePrice) - 1) * 100
+    : 0;
+  const topixReturn = latestTracking && firstTopix > 0
+    ? ((latestTracking.topix / firstTopix) - 1) * 100
+    : 0;
+  const alpha = latestTracking ? latestTracking.cumulative_alpha : 0;
+  const tier = pick.kiyohara_compliant ? '清原適合' : '監視対象';
+  const reason = pick.reason || '評価理由はまだありません。';
+
+  const html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>${pick.code} ${pick.name} | 清原メソッド・スクリーナー</title>
+<meta name="description" content="${pick.name}(${pick.code})の清原メソッドスクリーニング結果。実質PER ${pick.real_per.toFixed(1)}倍、経営スコア ${pick.management_score}点、${tier}。" />
+<link rel="canonical" href="${c.env.APP_URL}/picks/${pick.code}" />
+<meta property="og:title" content="${pick.code} ${pick.name} | 清原メソッド・スクリーナー" />
+<meta property="og:description" content="実質PER ${pick.real_per.toFixed(1)}倍、経営スコア ${pick.management_score}点。${tier}。" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "name": "${pick.name} (${pick.code})",
+  "description": "清原メソッドスクリーニング結果",
+  "about": { "@type": "Corporation", "name": "${pick.name}", "tickerSymbol": "${pick.code}" }
+}
+</script>
+</head>
+<body style="font-family:system-ui,sans-serif;max-width:720px;margin:0 auto;padding:2rem;color:#1e293b;background:#f8fafc">
+<h1>${pick.code} ${pick.name}</h1>
+<p style="color:#64748b">${tier} | 選定日: ${pick.picked_at}</p>
+
+<h2>定量指標</h2>
+<table style="width:100%;border-collapse:collapse">
+<tr><td style="padding:4px 0;color:#64748b">時価総額</td><td style="text-align:right">${pick.market_cap.toFixed(1)} 億円</td></tr>
+<tr><td style="padding:4px 0;color:#64748b">ネットキャッシュ</td><td style="text-align:right">${pick.net_cash.toFixed(1)} 億円</td></tr>
+<tr><td style="padding:4px 0;color:#64748b">実質PER</td><td style="text-align:right;font-weight:700;color:${pick.real_per <= 10 ? '#16a34a' : '#1e293b'}">${pick.real_per.toFixed(1)} 倍</td></tr>
+<tr><td style="padding:4px 0;color:#64748b">売上成長率 3Y</td><td style="text-align:right">${pick.sales_growth != null ? (pick.sales_growth * 100).toFixed(1)+'%' : 'N/A'}</td></tr>
+<tr><td style="padding:4px 0;color:#64748b">営業利益成長率 3Y</td><td style="text-align:right">${pick.profit_growth != null ? (pick.profit_growth * 100).toFixed(1)+'%' : 'N/A'}</td></tr>
+</table>
+
+<h2>AI 定性評価</h2>
+<p><strong>オーナー企業:</strong> ${pick.is_owner_company ? 'はい' : 'いいえ'}</p>
+<p><strong>経営スコア:</strong> ${pick.management_score} / 100</p>
+<p><strong>評価理由:</strong> ${reason}</p>
+
+${latestTracking ? `
+<h2>パフォーマンス</h2>
+<table style="width:100%;border-collapse:collapse">
+<tr><td style="padding:4px 0;color:#64748b">現在株価</td><td style="text-align:right;font-weight:700">¥${latestTracking.price.toLocaleString('ja-JP')}</td></tr>
+<tr><td style="padding:4px 0;color:#64748b">株価リターン</td><td style="text-align:right;color:${stockReturn >= 0 ? '#16a34a' : '#dc2626'}">${stockReturn >= 0 ? '+' : ''}${stockReturn.toFixed(2)}%</td></tr>
+<tr><td style="padding:4px 0;color:#64748b">日経平均リターン</td><td style="text-align:right;color:${topixReturn >= 0 ? '#16a34a' : '#dc2626'}">${topixReturn >= 0 ? '+' : ''}${topixReturn.toFixed(2)}%</td></tr>
+<tr><td style="padding:4px 0;color:#64748b">累積 Alpha</td><td style="text-align:right;font-weight:700;color:${alpha >= 0 ? '#16a34a' : '#dc2626'}">${alpha >= 0 ? '+' : ''}${alpha.toFixed(2)}%</td></tr>
+</table>
+` : ''}
+
+<p style="margin-top:2rem"><a href="https://disclosure.edinet-fsa.go.jp/" style="color:#2563eb">EDINET で有価証券報告書を確認する →</a></p>
+<p><a href="/" style="color:#64748b;font-size:.875rem">← 清原メソッド・スクリーナーに戻る</a></p>
+</body>
+</html>`;
+
+  return c.html(html);
+});
+
 // --- API: GitHub Actionsからのスクリーニング結果受信 ---
 app.post('/api/screening/receive', async (c) => {
   const token = c.req.header('X-Screening-Token');
