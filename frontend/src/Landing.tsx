@@ -124,6 +124,44 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Book */}
+      <section className="relative px-6 py-32 border-t border-white/5">
+        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+          <div>
+            <span className="text-xs tracking-[0.2em] uppercase text-amber-500 font-semibold mb-4 block">
+              原著
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
+              「わが投資術<br />市場は誰に微笑むか」
+            </h2>
+            <p className="text-sm text-gray-400 leading-relaxed mb-2">
+              清原達郎 著 / 講談社
+            </p>
+            <p className="text-sm text-gray-500 leading-relaxed mb-6">
+              伝説の投資家が明かす「割安小型成長株×オーナー企業」の選定法。
+              このスクリーナーは清原メソッドの実践を自動化したものです。
+            </p>
+            <a
+              href="https://hb.afl.rakuten.co.jp/hgc/【アフィリエイトIDを入力】/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fbook%2F17770405%2F"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-white/10 text-sm text-gray-300 hover:border-amber-500/30 hover:text-white transition-all"
+            >
+              <span>楽天ブックスで購入</span>
+              <span className="text-lg">→</span>
+            </a>
+          </div>
+          <div className="flex justify-center">
+            <img
+              src="https://tshop.r10s.jp/book/cabinet/0355/9784065350355_1_2.jpg"
+              alt="わが投資術 市場は誰に微笑むか 清原達郎"
+              className="w-64 rounded-lg shadow-2xl shadow-black/40"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      </section>
+
       {/* Pick Preview */}
       {picks.length > 0 && (
         <section className="relative px-6 py-32">
