@@ -1,8 +1,13 @@
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 
 export default function Method() {
   return (
     <div className="min-h-screen bg-[#080c14] text-white">
+      <Helmet>
+        <title>清原メソッドの全7基準を徹底解説 | 清原メソッド・スクリーナー</title>
+        <meta name="description" content="清原メソッドの全7基準（時価総額・実質PER・ネットキャッシュ・成長率・オーナー企業・経営スコア）と、AIによる自動スクリーニングの仕組みを詳しく解説します。" />
+      </Helmet>
       <header className="border-b border-white/5 px-6 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <Link to="/" className="text-sm text-gray-400 hover:text-white transition-colors">← トップ</Link>

@@ -1,8 +1,13 @@
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 
 export default function About() {
   return (
     <div className="min-h-screen bg-[#080c14] text-white">
+      <Helmet>
+        <title>運営者情報・免責事項 | 清原メソッド・スクリーナー</title>
+        <meta name="description" content="清原メソッド・スクリーナーの運営者情報と免責事項。本サービスは投資助言を目的としたものではありません。" />
+      </Helmet>
       <header className="border-b border-white/5 px-6 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <Link to="/" className="text-sm text-gray-400 hover:text-white transition-colors">← トップ</Link>

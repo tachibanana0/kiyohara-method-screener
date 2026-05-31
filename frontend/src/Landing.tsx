@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
@@ -18,6 +19,10 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-[#080c14] text-white overflow-x-hidden">
+      <Helmet>
+        <title>【完全無料】清原メソッド・スクリーナー | AIが割安小型成長株を毎日自動選定</title>
+        <meta name="description" content="東証グロース全250銘柄を毎日AIがスクリーニング。時価総額2,000億円以下・実質PER・ネットキャッシュ・成長率から割安小型成長株を発掘し、オーナー企業を判定。選定後は超過収益Alphaをトラッキング。清原達郎「わが投資術」の実践を完全自動化。" />
+      </Helmet>
       {/* Hero */}
       <section className="relative min-h-screen flex items-center justify-center px-6 py-24">
         <div className="absolute inset-0 bg-gradient-to-b from-blue-950/40 via-transparent to-[#080c14]" />

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import PerformanceChart from './components/PerformanceChart';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
@@ -34,6 +35,10 @@ export default function StockDetail() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <Helmet>
+        <title>{pick.code} {pick.name}（{pick.kiyohara_compliant ? '清原適合' : '監視対象'}）PER{pick.real_per.toFixed(1)}倍 スコア{pick.management_score} | 清原メソッド</title>
+        <meta name="description" content={`${pick.name}(${pick.code}) — 実質PER ${pick.real_per.toFixed(1)}倍、時価総額 ${pick.market_cap.toFixed(0)}億円、経営スコア ${pick.management_score}/100。${pick.kiyohara_compliant ? '清原メソッドの全基準を満たす適合銘柄。' : '監視対象銘柄。'}${pick.reason ? ' AI評価: ' + pick.reason.slice(0, 100) : ''}`} />
+      </Helmet>
       <header className="bg-primary text-white">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-4">
           <Link to="/dashboard" className="text-xs text-gray-500 hover:text-gray-300 transition-colors">← 一覧</Link>

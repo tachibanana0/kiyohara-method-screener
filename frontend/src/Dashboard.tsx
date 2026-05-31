@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import PickList from './components/PickList';
 import PerformanceChart from './components/PerformanceChart';
 
@@ -79,6 +80,10 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <Helmet>
+        <title>{picks.length > 0 ? `選定銘柄一覧（${picks.length}件）` : '選定銘柄一覧'} | 清原メソッド・スクリーナー</title>
+        <meta name="description" content={`清原メソッドによるスクリーニング結果。${picks.length}件の選定銘柄（清原適合${compliantCount}件・監視対象${watchCount}件）の詳細データを閲覧できます。`} />
+      </Helmet>
       <header className="bg-primary text-white">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
