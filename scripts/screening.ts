@@ -18,6 +18,7 @@ interface JQuantsSymbol {
   Code: string;
   CoName: string;
   Mkt: string;
+  S33?: string;
 }
 
 interface JQuantsStatement {
@@ -581,18 +582,29 @@ async function runScreening(): Promise<PickResult[]> {
 
   console.log('Step 1: 銘柄マスター取得');
   const symbols = await jquants.fetchAllSymbols();
+  const ALL_MARKETS = process.env.ALL_MARKETS === 'true';
+  const TARGET_MARKETS = ALL_MARKETS
+    ? ['0111', '0112', '0113', '0115'] // Prime, Standard, Growth, JASDAQ
+    : ['0113'];                         // Growth only (default)
+
+  // 除外業種（S33コード）：銀行・証券・保険・電力など財務構造が特殊な業種
+  const EXCLUDED_S33 = new Set(['7050', '7100', '7200', '4050', '6050', '1050']);
+
   const targetSymbols = symbols.filter((s) => {
-    if ((s.Mkt || '') !== '0113') return false;
+    if (!TARGET_MARKETS.includes(s.Mkt || '')) return false;
+    // 業種フィルタ：金融・電力等を除外
+    if (s.S33 && EXCLUDED_S33.has(s.S33)) return false;
     const codeWithoutTrailingZero = (s.Code || '').replace(/0$/, '');
     return /^\d{4}$/.test(codeWithoutTrailingZero);
   });
-  console.log(`Target: ${targetSymbols.length} TSE Growth stocks`);
+  console.log(`Target: ${targetSymbols.length} stocks (${TARGET_MARKETS.join(',')})`);
 
   // edinetCode map — dynamically built from EDINET API search results
   const edinetCodeMap = new Map<string, string>();
 
-  // バッチ処理: 1日50銘柄ずつ、6日で全銘柄カバー
+  // バッチ処理: ALL_MARKETS有効時はカバレッジが広いためバッチ数を増やす
   const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '50', 10);
+  const TOTAL_BATCHES = ALL_MARKETS ? 12 : 5; // 全市場の場合は12バッチ(3倍)に分割
 // 選定基準 (Kiyohara-strict) — 清原達郎『わが投資術』第3章に基づく
 const MAX_MARKET_CAP = parseInt(process.env.MAX_MARKET_CAP || '270', 10);
 const MAX_PER = parseInt(process.env.MAX_PER || '25', 10);
@@ -609,11 +621,11 @@ const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // 
   const batchIndexFromEnv = process.env.BATCH_INDEX;
   const batchIndex = batchIndexFromEnv != null
     ? parseInt(batchIndexFromEnv, 10)
-    : (BATCH_SIZE === 50 ? (dayOfWeek - 1 + 5) % 5 : 0);
+    : (BATCH_SIZE === 50 ? (dayOfWeek - 1 + TOTAL_BATCHES) % TOTAL_BATCHES : 0);
   const startIdx = batchIndex * BATCH_SIZE;
   const endIdx = Math.min(startIdx + BATCH_SIZE, targetSymbols.length);
   const batchSymbols = targetSymbols.slice(startIdx, endIdx);
-  console.log(`Batch ${batchIndex + 1}/5: processing stocks ${startIdx + 1}-${endIdx} of ${targetSymbols.length}`);
+  console.log(`Batch ${batchIndex + 1}/${TOTAL_BATCHES}: processing stocks ${startIdx + 1}-${endIdx} of ${targetSymbols.length}`);
 
   console.log('Step 2: Yahoo Financeで株価取得');
   const codes = batchSymbols.map((s) => s.Code);

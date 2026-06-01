@@ -2,7 +2,7 @@ name: Daily Stock Screening
 
 on:
   schedule:
-    - cron: '0 6 * * 1-5'
+    - cron: '0 0,6 * * *'
   workflow_dispatch:
 
 permissions:
@@ -14,13 +14,10 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-
       - run: npm install
-
       - name: Run Screening
         env:
           JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}

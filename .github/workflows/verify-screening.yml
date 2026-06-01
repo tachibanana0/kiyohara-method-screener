@@ -47,6 +47,10 @@ on:
         description: 'Require PER < cap/100'
         required: false
         default: 'false'
+      all_markets:
+        description: 'Include all markets (Prime, Standard, Growth, JASDAQ)'
+        required: false
+        default: 'false'
 
 permissions:
   contents: read
@@ -79,4 +83,5 @@ jobs:
           BATCH_INDEX: ${{ inputs.batch_index }}
           MIN_NET_CASH_RATIO: ${{ inputs.min_net_cash_ratio }}
           REQUIRE_PER_CAP_RATIO: ${{ inputs.require_per_cap_ratio }}
+          ALL_MARKETS: ${{ inputs.all_markets }}
         run: npx tsx scripts/screening.ts
