@@ -39,6 +39,10 @@ on:
         description: 'Force batch index (0-4)'
         required: false
         default: ''
+      min_net_cash_ratio:
+        description: 'Minimum net cash ratio (e.g. 0.20 = 20%)'
+        required: false
+        default: '0.20'
 
 permissions:
   contents: read
@@ -69,4 +73,5 @@ jobs:
           REQUIRE_PROFIT: ${{ inputs.require_profit }}
           SKIP_LOW_GROWTH: ${{ inputs.skip_low_growth }}
           BATCH_INDEX: ${{ inputs.batch_index }}
+          MIN_NET_CASH_RATIO: ${{ inputs.min_net_cash_ratio }}
         run: npx tsx scripts/screening.ts
