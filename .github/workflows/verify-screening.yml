@@ -10,11 +10,11 @@ on:
       max_market_cap:
         description: 'Max market cap (億円)'
         required: false
-        default: '2000'
+        default: '270'
       max_per:
         description: 'Max real PER'
         required: false
-        default: '50'
+        default: '25'
       min_score:
         description: 'Min score (Kiyohara-compliant)'
         required: false
@@ -22,19 +22,19 @@ on:
       watch_per:
         description: 'Watchlist max PER'
         required: false
-        default: '80'
+        default: '40'
       watch_score:
         description: 'Watchlist min score'
         required: false
-        default: '10'
+        default: '20'
       require_profit:
         description: 'Require positive profit (true/false)'
         required: false
-        default: 'false'
+        default: 'true'
       skip_low_growth:
         description: 'Skip negative growth stocks (true/false)'
         required: false
-        default: 'false'
+        default: 'true'
       batch_index:
         description: 'Force batch index (0-4)'
         required: false

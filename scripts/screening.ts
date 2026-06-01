@@ -34,6 +34,7 @@ interface QuantScreenedStock {
   name: string;
   marketCap: number;
   netCash: number;
+  netCashRatio: number;
   realPER: number;
   salesGrowth3Y: number;
   profitGrowth3Y: number;
@@ -53,6 +54,7 @@ interface PickResult {
   name: string;
   marketCap: number;
   netCash: number;
+  netCashRatio: number;
   realPER: number;
   salesGrowth3Y: number;
   profitGrowth3Y: number;
@@ -591,16 +593,17 @@ async function runScreening(): Promise<PickResult[]> {
 
   // バッチ処理: 1日50銘柄ずつ、6日で全銘柄カバー
   const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '50', 10);
-// 選定基準 (Kiyohara-strict)
-const MAX_MARKET_CAP = parseInt(process.env.MAX_MARKET_CAP || '2000', 10);
-const MAX_PER = parseInt(process.env.MAX_PER || '50', 10);
+// 選定基準 (Kiyohara-strict) — 清原達郎『わが投資術』第3章に基づく
+const MAX_MARKET_CAP = parseInt(process.env.MAX_MARKET_CAP || '270', 10);
+const MAX_PER = parseInt(process.env.MAX_PER || '25', 10);
 const MIN_SCORE = parseInt(process.env.MIN_SCORE || '50', 10);
+const MIN_NET_CASH_RATIO = parseFloat(process.env.MIN_NET_CASH_RATIO || '0.20'); // ネットキャッシュ比率20%以上
 // 監視対象 (Watchlist) — 清原基準から外れても拾う閾値
-const WATCH_PER = parseInt(process.env.WATCH_PER || '80', 10);
-const WATCH_SCORE = parseInt(process.env.WATCH_SCORE || '10', 10);
+const WATCH_PER = parseInt(process.env.WATCH_PER || '40', 10);
+const WATCH_SCORE = parseInt(process.env.WATCH_SCORE || '20', 10);
 // 定量フィルターの緩衝閾値
 const REQUIRE_PROFIT = process.env.REQUIRE_PROFIT !== 'false';  // true by default
-const SKIP_LOW_GROWTH = process.env.SKIP_LOW_GROWTH !== 'true'; // false by default (don't skip)
+const SKIP_LOW_GROWTH = process.env.SKIP_LOW_GROWTH !== 'false'; // true by default (清原基準に合わせる)
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
   const batchIndexFromEnv = process.env.BATCH_INDEX;
@@ -655,6 +658,14 @@ const SKIP_LOW_GROWTH = process.env.SKIP_LOW_GROWTH !== 'true'; // false by defa
 
       const cash = latest.CashEq || 0;
       const netCash = cash / 1e8;
+      const netCashRatio = marketCap > 0 ? netCash / marketCap : 0;
+
+      // 清原基準: ネットキャッシュ比率 ≧ 20% (財務健全性)
+      if (netCashRatio < MIN_NET_CASH_RATIO) {
+        console.log(`Skip ${sym.Code}: net cash ratio ${(netCashRatio * 100).toFixed(1)}% < ${(MIN_NET_CASH_RATIO * 100).toFixed(0)}%`);
+        continue;
+      }
+
       const profit = latest.NP || 0;
       if (REQUIRE_PROFIT && profit <= 0) {
         console.log(`Skip ${sym.Code}: no profit`);
@@ -664,6 +675,12 @@ const SKIP_LOW_GROWTH = process.env.SKIP_LOW_GROWTH !== 'true'; // false by defa
       const realPER = (marketCap - netCash) / (profit / 1e8);
       if (realPER > MAX_PER || realPER <= 0) {
         console.log(`Skip ${sym.Code}: realPER ${realPER.toFixed(1)} > ${MAX_PER}`);
+        continue;
+      }
+
+      // 清原基準: PER < 時価総額/100
+      if (realPER >= marketCap / 100) {
+        console.log(`Skip ${sym.Code}: PER ${realPER.toFixed(1)} >= cap/100 = ${(marketCap / 100).toFixed(1)}`);
         continue;
       }
 
@@ -684,9 +701,10 @@ const SKIP_LOW_GROWTH = process.env.SKIP_LOW_GROWTH !== 'true'; // false by defa
         name: sym.CoName,
         marketCap,
         netCash,
+        netCashRatio,
         realPER,
         salesGrowth3Y: salesGrowth,
-        profitGrowth3Y: profitGrowth,
+        profitGrowth3Y: profit,
         latestPrice: priceData.close,
         latestTopix: topix ?? 0,
         fiscalYearEnd: latest.CurPerEn,
@@ -745,6 +763,7 @@ const SKIP_LOW_GROWTH = process.env.SKIP_LOW_GROWTH !== 'true'; // false by defa
         name: item.stock.name,
         marketCap: item.stock.marketCap,
         netCash: item.stock.netCash,
+        netCashRatio: item.stock.netCashRatio,
         realPER: item.stock.realPER,
         salesGrowth3Y: item.stock.salesGrowth3Y,
         profitGrowth3Y: item.stock.profitGrowth3Y,
@@ -773,6 +792,7 @@ const SKIP_LOW_GROWTH = process.env.SKIP_LOW_GROWTH !== 'true'; // false by defa
         name: item.stock.name,
         marketCap: item.stock.marketCap,
         netCash: item.stock.netCash,
+        netCashRatio: item.stock.netCashRatio,
         realPER: item.stock.realPER,
         salesGrowth3Y: item.stock.salesGrowth3Y,
         profitGrowth3Y: item.stock.profitGrowth3Y,

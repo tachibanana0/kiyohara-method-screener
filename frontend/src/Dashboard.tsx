@@ -115,10 +115,12 @@ export default function Dashboard() {
                   <div>
                     <div className="text-[10px] uppercase tracking-widest text-muted mb-1.5">定量フィルター</div>
                     <ul className="space-y-0.5">
-                      <li className="text-xs text-gray-700">時価総額 <b>&lt; 2,000</b>億円</li>
-                      <li className="text-xs text-gray-700">実質PER <b>&lt; 50</b>倍</li>
-                      <li className="text-xs text-gray-700">当期純利益 <b>&gt; 0</b> (optional)</li>
-                      <li className="text-xs text-gray-700">3年売上成長率 <b>&gt; 0%</b> (optional)</li>
+                      <li className="text-xs text-gray-700">時価総額 <b>&lt; 270</b>億円</li>
+                      <li className="text-xs text-gray-700">実質PER <b>&lt; 25</b>倍</li>
+                      <li className="text-xs text-gray-700">PER <b>&lt; 時価総額/100</b></li>
+                      <li className="text-xs text-gray-700">ネットキャッシュ比率 <b>&ge; 20%</b></li>
+                      <li className="text-xs text-gray-700">当期純利益 <b>&gt; 0</b></li>
+                      <li className="text-xs text-gray-700">3年売上・営利成長率 <b>&gt; 0%</b></li>
                     </ul>
                     <p className="text-xs text-muted/60 mt-1">J-Quants + Yahoo Finance</p>
                   </div>
@@ -127,15 +129,14 @@ export default function Dashboard() {
                     <ul className="space-y-0.5">
                       <li className="text-xs text-gray-700"><span className="text-success font-semibold">オーナー企業</span>判定</li>
                       <li className="text-xs text-gray-700">経営評価スコア <b>&ge; 50</b></li>
-                      <li className="text-xs text-gray-700">実質PER <b>&lt; 10</b>倍</li>
                     </ul>
                     <p className="text-xs text-muted/60 mt-1">EDINET → LLM評価</p>
                   </div>
                   <div>
                     <div className="text-[10px] uppercase tracking-widest text-muted mb-1.5">監視対象 (Tier 2)</div>
                     <ul className="space-y-0.5">
-                      <li className="text-xs text-gray-700">経営評価スコア <b>&ge; 10</b></li>
-                      <li className="text-xs text-gray-700">実質PER <b>&lt; 80</b>倍</li>
+                      <li className="text-xs text-gray-700">経営評価スコア <b>&ge; 20</b></li>
+                      <li className="text-xs text-gray-700">実質PER <b>&lt; 40</b>倍</li>
                       <li className="text-xs text-gray-700">オーナー企業不問</li>
                     </ul>
                     <p className="text-xs text-muted/60 mt-1">条件緩和枠</p>

@@ -1,0 +1,1 @@
+ALTER TABLE picks ADD COLUMN net_cash_ratio REAL DEFAULT 0;

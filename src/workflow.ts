@@ -263,6 +263,7 @@ export class ScreeningWorkflowV2 extends WorkflowEntrypoint<Env, ScreeningWorkfl
                 latestTopix: item.stock.latestTopix,
                 kiyoharaCompliant: true,
                 reason: item.eval.reason,
+                netCashRatio: (item.stock as any).netCashRatio ?? 0,
               });
             }
             count++;
