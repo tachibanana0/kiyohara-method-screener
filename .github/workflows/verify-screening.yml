@@ -40,9 +40,13 @@ on:
         required: false
         default: ''
       min_net_cash_ratio:
-        description: 'Minimum net cash ratio (e.g. 0.20 = 20%)'
+        description: 'Minimum net cash ratio (e.g. 0.05 = 5%)'
         required: false
-        default: '0.20'
+        default: '0.05'
+      require_per_cap_ratio:
+        description: 'Require PER < cap/100'
+        required: false
+        default: 'false'
 
 permissions:
   contents: read
@@ -74,4 +78,5 @@ jobs:
           SKIP_LOW_GROWTH: ${{ inputs.skip_low_growth }}
           BATCH_INDEX: ${{ inputs.batch_index }}
           MIN_NET_CASH_RATIO: ${{ inputs.min_net_cash_ratio }}
+          REQUIRE_PER_CAP_RATIO: ${{ inputs.require_per_cap_ratio }}
         run: npx tsx scripts/screening.ts

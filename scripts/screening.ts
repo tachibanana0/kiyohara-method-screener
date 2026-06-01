@@ -597,13 +597,13 @@ async function runScreening(): Promise<PickResult[]> {
 const MAX_MARKET_CAP = parseInt(process.env.MAX_MARKET_CAP || '270', 10);
 const MAX_PER = parseInt(process.env.MAX_PER || '25', 10);
 const MIN_SCORE = parseInt(process.env.MIN_SCORE || '50', 10);
-const MIN_NET_CASH_RATIO = parseFloat(process.env.MIN_NET_CASH_RATIO || '0.20'); // ネットキャッシュ比率20%以上
+const MIN_NET_CASH_RATIO = parseFloat(process.env.MIN_NET_CASH_RATIO || '0.05'); // ネットキャッシュ比率5%以上
 // 監視対象 (Watchlist) — 清原基準から外れても拾う閾値
 const WATCH_PER = parseInt(process.env.WATCH_PER || '40', 10);
 const WATCH_SCORE = parseInt(process.env.WATCH_SCORE || '20', 10);
 // 定量フィルターの緩衝閾値
 const REQUIRE_PROFIT = process.env.REQUIRE_PROFIT !== 'false';  // true by default
-const SKIP_LOW_GROWTH = process.env.SKIP_LOW_GROWTH !== 'false'; // true by default (清原基準に合わせる)
+const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // PER < cap/100 (清原基準、デフォルト有効)
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
   const batchIndexFromEnv = process.env.BATCH_INDEX;
@@ -678,8 +678,8 @@ const SKIP_LOW_GROWTH = process.env.SKIP_LOW_GROWTH !== 'false'; // true by defa
         continue;
       }
 
-      // 清原基準: PER < 時価総額/100
-      if (realPER >= marketCap / 100) {
+      // 清原基準: PER < 時価総額/100 (configurable)
+      if (REQUIRE_PER_CAP_RATIO && realPER >= marketCap / 100) {
         console.log(`Skip ${sym.Code}: PER ${realPER.toFixed(1)} >= cap/100 = ${(marketCap / 100).toFixed(1)}`);
         continue;
       }
