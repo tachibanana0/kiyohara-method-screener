@@ -660,8 +660,9 @@ const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // 
       const netCash = cash / 1e8;
       const netCashRatio = marketCap > 0 ? netCash / marketCap : 0;
 
-      // 清原基準: ネットキャッシュ比率 ≧ 20% (財務健全性)
-      if (netCashRatio < MIN_NET_CASH_RATIO) {
+      // 清原基準: ネットキャッシュ比率チェック（CashEqのデータがある場合のみ）
+      const hasCashData = cash > 0; // CashEqが0ならJ-Quants無料APIがデータ未返却 = 不明扱い
+      if (hasCashData && netCashRatio < MIN_NET_CASH_RATIO) {
         console.log(`Skip ${sym.Code}: net cash ratio ${(netCashRatio * 100).toFixed(1)}% < ${(MIN_NET_CASH_RATIO * 100).toFixed(0)}%`);
         continue;
       }
