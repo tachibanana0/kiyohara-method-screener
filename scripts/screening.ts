@@ -235,11 +235,10 @@ async function fetchYfinanceData(codes: string[]): Promise<{ topix: number; stoc
   }
   try {
     console.log('YFINANCE DEBUG: calling execSync...');
-    // @ts-ignore - require is available in tsx/Node.js runtime
-    const { execSync } = require('child_process');
+    const cp = await import('child_process');
     const cmd = `python3 scripts/yfinance_data.py ${codes.join(' ')}`;
     console.log(`YFINANCE DEBUG: ${cmd.slice(0, 100)}...`);
-    const result = execSync(cmd, { encoding: 'utf-8', timeout: 120000 });
+    const result = cp.execSync(cmd, { encoding: 'utf-8', timeout: 120000 });
     console.log('YFINANCE DEBUG: execSync succeeded');
     const data = JSON.parse(result);
     if (data.error) {
