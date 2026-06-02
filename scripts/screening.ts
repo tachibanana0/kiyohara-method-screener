@@ -230,11 +230,12 @@ async function fetchYfinanceData(codes: string[]): Promise<{ topix: number; stoc
   const stocks = new Map<string, any>();
   if (codes.length === 0) return { topix: 0, stocks };
   try {
-    const { execSync } = await import('node:child_process');
+    // Use require (not dynamic import) for execSync in tsx
+    const { execSync } = require('child_process');
     console.log(`Calling yfinance for ${codes.length} stocks...`);
     const result = execSync(
       `python3 scripts/yfinance_data.py ${codes.join(' ')}`,
-      { encoding: 'utf-8', timeout: 120000 }
+      { encoding: 'utf-8', stdio: 'pipe', timeout: 120000 }
     );
     const data = JSON.parse(result);
     if (data.error) {
