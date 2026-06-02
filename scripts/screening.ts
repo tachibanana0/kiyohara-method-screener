@@ -228,9 +228,10 @@ class JQuantsClient {
 
 async function fetchYfinanceData(codes: string[]): Promise<{ topix: number; stocks: Map<string, any> }> {
   const stocks = new Map<string, any>();
+  if (codes.length === 0) return { topix: 0, stocks };
   try {
     const { execSync } = await import('node:child_process');
-    if (codes.length === 0) return { topix: 0, stocks };
+    console.log(`Calling yfinance for ${codes.length} stocks...`);
     const result = execSync(
       `python3 scripts/yfinance_data.py ${codes.join(' ')}`,
       { encoding: 'utf-8', timeout: 120000 }
@@ -243,9 +244,10 @@ async function fetchYfinanceData(codes: string[]): Promise<{ topix: number; stoc
     for (const s of data.stocks || []) {
       stocks.set(s.code, s);
     }
+    console.log(`yfinance returned: ${stocks.size} stocks, TOPIX=${data.topix}`);
     return { topix: data.topix || 0, stocks };
-  } catch (err) {
-    console.warn('yfinance data fetch failed:', err);
+  } catch (err: any) {
+    console.warn('yfinance data fetch failed:', err.message || err, err.stderr || '');
     return { topix: 0, stocks };
   }
 }
