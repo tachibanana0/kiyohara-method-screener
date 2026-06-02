@@ -228,18 +228,11 @@ class JQuantsClient {
 
 async function fetchYfinanceData(codes: string[]): Promise<{ topix: number; stocks: Map<string, any> }> {
   const stocks = new Map<string, any>();
-  console.log(`YFINANCE DEBUG: got ${codes.length} codes`);
-  if (codes.length === 0) {
-    console.log('YFINANCE DEBUG: no codes, returning empty');
-    return { topix: 0, stocks };
-  }
+  if (codes.length === 0) return { topix: 0, stocks };
   try {
-    console.log('YFINANCE DEBUG: calling execSync...');
     const cp = await import('child_process');
     const cmd = `python3 scripts/yfinance_data.py ${codes.join(' ')}`;
-    console.log(`YFINANCE DEBUG: ${cmd.slice(0, 100)}...`);
     const result = cp.execSync(cmd, { encoding: 'utf-8', timeout: 120000 });
-    console.log('YFINANCE DEBUG: execSync succeeded');
     const data = JSON.parse(result);
     if (data.error) {
       console.warn('yfinance error:', data.error);
@@ -248,10 +241,10 @@ async function fetchYfinanceData(codes: string[]): Promise<{ topix: number; stoc
     for (const s of data.stocks || []) {
       stocks.set(s.code, s);
     }
-    console.log(`yfinance returned: ${stocks.size} stocks, TOPIX=${data.topix}`);
+    console.log(`yfinance: ${stocks.size} stocks, TOPIX=${data.topix}`);
     return { topix: data.topix || 0, stocks };
   } catch (err: any) {
-    console.warn('YFINANCE DEBUG catch:', err && err.message ? err.message : String(err));
+    console.warn('yfinance failed:', err.message || err);
     return { topix: 0, stocks };
   }
 }
