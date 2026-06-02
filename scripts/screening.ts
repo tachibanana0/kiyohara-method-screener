@@ -532,6 +532,7 @@ async function runScreening(): Promise<PickResult[]> {
   }
 
   const jquants = new JQuantsClient(jquantsApiKey);
+  const edinet = new EdinetClient(edinetSubscriptionKey);
   const openrouter = new OpenRouterClient(openrouterApiKey);
 
   console.log('Step 1: 銘柄マスター取得');
