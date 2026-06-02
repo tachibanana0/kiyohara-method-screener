@@ -569,6 +569,7 @@ const WATCH_PER = parseInt(process.env.WATCH_PER || '40', 10);
 const WATCH_SCORE = parseInt(process.env.WATCH_SCORE || '20', 10);
 // 定量フィルターの緩衝閾値
 const REQUIRE_PROFIT = process.env.REQUIRE_PROFIT !== 'false';  // true by default
+const SKIP_LOW_GROWTH = process.env.SKIP_LOW_GROWTH !== 'false'; // true by default
 const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // PER < cap/100 (清原基準、デフォルト有効)
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
