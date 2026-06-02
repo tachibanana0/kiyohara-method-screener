@@ -635,15 +635,16 @@ const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // 
       const netCash = netCashFromBS > 0 ? netCashFromBS : ((latest.CashEq || 0) / 1e8);
       const realPER = (marketCap - netCash) / (profit / 1e8);
 
-      if (realPER > MAX_PER || realPER <= 0) {
-        console.log(`Skip ${sym.Code}: realPER ${realPER.toFixed(1)} > ${MAX_PER}`);
-        continue;
-      }
-
-      // 清原基準: PER < 時価総額/100
-      if (REQUIRE_PER_CAP_RATIO && realPER >= marketCap / 100) {
-        console.log(`Skip ${sym.Code}: PER ${realPER.toFixed(1)} >= cap/100 = ${(marketCap / 100).toFixed(1)}`);
-        continue;
+      if (profit > 0) {
+        if (realPER > MAX_PER || realPER <= 0) {
+          console.log(`Skip ${sym.Code}: realPER ${realPER.toFixed(1)} > ${MAX_PER}`);
+          continue;
+        }
+        // 清原基準: PER < 時価総額/100
+        if (REQUIRE_PER_CAP_RATIO && realPER >= marketCap / 100) {
+          console.log(`Skip ${sym.Code}: PER ${realPER.toFixed(1)} >= cap/100 = ${(marketCap / 100).toFixed(1)}`);
+          continue;
+        }
       }
 
       // ネットキャッシュ比率チェック（yfinance BSデータがある場合のみ）
