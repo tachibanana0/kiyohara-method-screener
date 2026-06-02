@@ -16,7 +16,8 @@ except ImportError:
 def get_stock_data(code: str) -> dict:
     """Get price, market cap, and balance sheet for one stock."""
     try:
-        ticker = yf.Ticker(f"{code}.T")
+        trimmed = code.removesuffix('0')  # 5桁→4桁 (e.g. 21730 → 2173)
+        ticker = yf.Ticker(f"{trimmed}.T")
         info = ticker.info
         price = (info.get("regularMarketPrice") or
                  info.get("currentPrice") or
