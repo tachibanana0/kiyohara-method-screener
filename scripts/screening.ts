@@ -560,19 +560,45 @@ async function runScreening(): Promise<PickResult[]> {
   // バッチ処理: ALL_MARKETS有効時はカバレッジが広いためバッチ数を増やす
   const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '50', 10);
   const TOTAL_BATCHES = ALL_MARKETS ? 12 : 5; // 全市場の場合は12バッチ(3倍)に分割
-// 選定基準 (Kiyohara-strict) — 清原達郎『わが投資術』第3章に基づく
-const MAX_MARKET_CAP = parseInt(process.env.MAX_MARKET_CAP || '270', 10);
-const MAX_PER = parseInt(process.env.MAX_PER || '25', 10);
-const MIN_SCORE = parseInt(process.env.MIN_SCORE || '50', 10);
-const MIN_NET_CASH_RATIO = parseFloat(process.env.MIN_NET_CASH_RATIO || '1.0'); // ネットキャッシュ比率100%以上（清原本基準）
-// 監視対象 (Watchlist) — 清原基準から外れても拾う閾値
-const WATCH_PER = parseInt(process.env.WATCH_PER || '40', 10);
-const WATCH_SCORE = parseInt(process.env.WATCH_SCORE || '20', 10);
-// 定量フィルターの緩衝閾値
-const REQUIRE_PROFIT = process.env.REQUIRE_PROFIT !== 'false';  // true by default
-const SKIP_LOW_GROWTH = process.env.SKIP_LOW_GROWTH !== 'false'; // true by default
-const MAX_PBR = parseFloat(process.env.MAX_PBR || '1.0'); // PBR <= 1.0（清原基準）
-const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // PER < cap/100 (清原基準、デフォルト有効)
+// 選定基準 — 清原達郎『わが投資術』に基づくスコア制
+// 本には一律閾値が明記されていないため、スコア制に変更
+const MIN_QUANT_SCORE = parseInt(process.env.MIN_QUANT_SCORE || '20', 10); // 定量スコア最低ライン
+const MIN_SCORE = parseInt(process.env.MIN_SCORE || '40', 10);  // 適合の総合スコア下限
+const WATCH_SCORE = parseInt(process.env.WATCH_SCORE || '10', 10); // 監視対象スコア下限
+const REQUIRE_PROFIT = process.env.REQUIRE_PROFIT !== 'false';
+const SKIP_LOW_GROWTH = process.env.SKIP_LOW_GROWTH !== 'false';
+
+function computeQuantScore(marketCap: number, realPER: number, ncRatio: number, pbr: number): number {
+  let score = 0;
+  // PER: 低いほど高得点。本では5倍,8倍,13倍が好例
+  if (realPER > 0 && realPER <= 5) score += 35;
+  else if (realPER > 5 && realPER <= 10) score += 25;
+  else if (realPER > 10 && realPER <= 15) score += 15;
+  else if (realPER > 15 && realPER <= 25) score += 8;
+  else if (realPER > 25 && realPER <= 40) score += 3;
+  // 赤字は0点（PER計算不可）
+
+  // PBR: 1倍以下が好ましい
+  if (pbr > 0 && pbr <= 0.5) score += 25;
+  else if (pbr > 0.5 && pbr <= 0.8) score += 20;
+  else if (pbr > 0.8 && pbr <= 1.0) score += 15;
+  else if (pbr > 1.0 && pbr <= 1.5) score += 5;
+  // PBR > 1.5 or unknown: 0
+
+  // ネットキャッシュ比率: 高いほど高得点
+  if (ncRatio >= 1.0) score += 25;
+  else if (ncRatio >= 0.5) score += 18;
+  else if (ncRatio >= 0.2) score += 10;
+  else if (ncRatio > 0) score += 5;
+  // negative: 0
+
+  // 小型株ボーナス
+  if (marketCap <= 100) score += 15;
+  else if (marketCap <= 270) score += 10;
+  else if (marketCap <= 500) score += 5;
+
+  return score; // 満点=100
+}
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
   const batchIndexFromEnv = process.env.BATCH_INDEX;
@@ -620,11 +646,7 @@ const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // 
       // Use yfinance market cap if available, fallback to price*shares
       const marketCap = yf.market_cap > 0
         ? yf.market_cap / 1e8
-        : (yf.price * shares) / 1e8;
-      if (marketCap > MAX_MARKET_CAP) {
-        console.log(`Skip ${sym.Code}: market cap ${marketCap.toFixed(1)}億円 > ${MAX_MARKET_CAP}億円`);
-        continue;
-      }
+        : (yf.price * (latest.ShOutFY || yf.shares || 0)) / 1e8;
 
       const profit = latest.NP || 0;
       if (REQUIRE_PROFIT && profit <= 0) {
@@ -636,32 +658,11 @@ const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // 
       const netCashFromBS = yf.net_cash > 0 ? yf.net_cash / 1e8 : 0;
       const netCashRatioFromBS = yf.net_cash_ratio || 0;
       const netCash = netCashFromBS > 0 ? netCashFromBS : ((latest.CashEq || 0) / 1e8);
-      const realPER = (marketCap - netCash) / (profit / 1e8);
+      const realPER = profit > 0 ? (marketCap - netCash) / (profit / 1e8) : 0;
 
-      if (profit > 0) {
-        if (realPER > MAX_PER || realPER <= 0) {
-          console.log(`Skip ${sym.Code}: realPER ${realPER.toFixed(1)} > ${MAX_PER}`);
-          continue;
-        }
-        // 清原基準: PER < 時価総額/100
-        if (REQUIRE_PER_CAP_RATIO && realPER >= marketCap / 100) {
-          console.log(`Skip ${sym.Code}: PER ${realPER.toFixed(1)} >= cap/100 = ${(marketCap / 100).toFixed(1)}`);
-          continue;
-        }
-      }
-
-      // ネットキャッシュ比率チェック（yfinance BSデータがある場合のみ）
-      if (netCashFromBS > 0 && netCashRatioFromBS < MIN_NET_CASH_RATIO) {
-        console.log(`Skip ${sym.Code}: net cash ratio ${(netCashRatioFromBS * 100).toFixed(1)}% < ${(MIN_NET_CASH_RATIO * 100).toFixed(0)}%`);
-        continue;
-      }
-
-      // PBR チェック（yfinance BSデータがある場合のみ）
+      // 清原スコア計算（閾値制 → スコア制に変更。本に一律閾値なし）
       const pbr = yf.pbr || 0;
-      if (pbr > 0 && pbr > MAX_PBR) {
-        console.log(`Skip ${sym.Code}: PBR ${pbr.toFixed(2)} > ${MAX_PBR}`);
-        continue;
-      }
+      const quantScore = computeQuantScore(marketCap, realPER, netCashRatioFromBS, pbr);
 
       let salesGrowth = 0;
       let profitGrowth = 0;
@@ -673,6 +674,11 @@ const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // 
           console.log(`Skip ${sym.Code}: insufficient growth`);
           continue;
         }
+      }
+
+      if (quantScore < MIN_QUANT_SCORE) {
+        console.log(`Skip ${sym.Code}: quant score ${quantScore} < ${MIN_QUANT_SCORE}`);
+        continue;
       }
 
       screened.push({
@@ -689,7 +695,7 @@ const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // 
         fiscalYearEnd: latest.CurPerEn,
       });
 
-      console.log(`PASS: ${sym.Code} ${sym.CoName} cap=${marketCap.toFixed(1)}B PER=${realPER.toFixed(1)} ncRatio=${(netCashRatioFromBS * 100).toFixed(0)}%`);
+      console.log(`PASS: ${sym.Code} ${sym.CoName} cap=${marketCap.toFixed(0)}億 PER=${realPER.toFixed(1)} nc=${(netCashRatioFromBS*100).toFixed(0)}% pbr=${pbr.toFixed(1)} score=${quantScore}`);
     } catch (err) {
       console.warn(`Screening failed for ${sym.Code}:`, err);
     }
@@ -734,13 +740,12 @@ const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // 
   const picks: PickResult[] = [];
   const pickedCodes = new Set<string>();
 
-  // Tier 1: 清原メソッド完全適合
+  // Tier 1: 清原メソッド完全適合（定量スコア通過済 + LLM評価）
   for (const item of evaluated) {
+    const combinedScore = item.eval.management_score; // LLMの定性評価
     if (
       item.eval.is_owner_company &&
-      item.eval.management_score >= MIN_SCORE &&
-      item.stock.realPER <= MAX_PER &&
-      item.stock.realPER > 0
+      combinedScore >= MIN_SCORE
     ) {
       picks.push({
         code: item.stock.code,
@@ -763,14 +768,10 @@ const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // 
     }
   }
 
-  // Tier 2: 監視対象 (Watchlist) — 清原基準は満たさないが近い
+  // Tier 2: 監視対象 (Watchlist)
   for (const item of evaluated) {
     if (pickedCodes.has(item.stock.code)) continue;
-    if (
-      item.eval.management_score >= WATCH_SCORE &&
-      item.stock.realPER <= WATCH_PER &&
-      item.stock.realPER > 0
-    ) {
+    if (item.eval.management_score >= WATCH_SCORE) {
       picks.push({
         code: item.stock.code,
         name: item.stock.name,

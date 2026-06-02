@@ -114,31 +114,29 @@ export default function Dashboard() {
                     <p className="text-xs text-muted/60 mt-1">J-Quants API より取得</p>
                   </div>
                   <div>
-                    <div className="text-[10px] uppercase tracking-widest text-muted mb-1.5">定量フィルター</div>
+                    <div className="text-[10px] uppercase tracking-widest text-muted mb-1.5">定量スコアリング</div>
                     <ul className="space-y-0.5">
-                      <li className="text-xs text-gray-700">時価総額 <b>&lt; 270</b>億円</li>
-                      <li className="text-xs text-gray-700">実質PER <b>&lt; 25</b>倍</li>
-                      <li className="text-xs text-gray-700">PER <b>&lt; 時価総額/100</b></li>
-                      <li className="text-xs text-gray-700">ネットキャッシュ比率 <b>&ge; 20%</b></li>
-                      <li className="text-xs text-gray-700">当期純利益 <b>&gt; 0</b></li>
-                      <li className="text-xs text-gray-700">3年売上・営利成長率 <b>&gt; 0%</b></li>
+                      <li className="text-xs text-gray-700">PER（低いほど高得点）</li>
+                      <li className="text-xs text-gray-700">PBR ≦ 1 倍を評価</li>
+                      <li className="text-xs text-gray-700">ネットキャッシュ比率（高いほど高得点）</li>
+                      <li className="text-xs text-gray-700">小型株ボーナス（cap 小ほど加点）</li>
+                      <li className="text-xs text-gray-700">定量スコア <b>&ge; 20</b> で通過</li>
                     </ul>
-                    <p className="text-xs text-muted/60 mt-1">J-Quants + Yahoo Finance</p>
+                    <p className="text-xs text-muted/60 mt-1">yfinance BS + J-Quants</p>
                   </div>
                   <div>
                     <div className="text-[10px] uppercase tracking-widest text-muted mb-1.5">清原適合 (Tier 1)</div>
                     <ul className="space-y-0.5">
                       <li className="text-xs text-gray-700"><span className="text-success font-semibold">オーナー企業</span>判定</li>
-                      <li className="text-xs text-gray-700">経営評価スコア <b>&ge; 50</b></li>
+                      <li className="text-xs text-gray-700">LLM スコア <b>&ge; 40</b></li>
                     </ul>
                     <p className="text-xs text-muted/60 mt-1">EDINET → LLM評価</p>
                   </div>
                   <div>
                     <div className="text-[10px] uppercase tracking-widest text-muted mb-1.5">監視対象 (Tier 2)</div>
                     <ul className="space-y-0.5">
-                      <li className="text-xs text-gray-700">経営評価スコア <b>&ge; 20</b></li>
-                      <li className="text-xs text-gray-700">実質PER <b>&lt; 40</b>倍</li>
-                      <li className="text-xs text-gray-700">オーナー企業不問</li>
+                      <li className="text-xs text-gray-700">LLM スコア <b>&ge; 10</b></li>
+                      <li className="text-xs text-gray-700">定量通過、定性未達</li>
                     </ul>
                     <p className="text-xs text-muted/60 mt-1">条件緩和枠</p>
                   </div>

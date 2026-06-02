@@ -7,26 +7,18 @@ on:
         description: 'Number of stocks to process'
         required: false
         default: '3'
-      max_market_cap:
-        description: 'Max market cap (億円)'
+      min_quant_score:
+        description: 'Minimum quantitative score (0-100)'
         required: false
-        default: '270'
-      max_per:
-        description: 'Max real PER'
-        required: false
-        default: '25'
+        default: '20'
       min_score:
-        description: 'Min score (Kiyohara-compliant)'
-        required: false
-        default: '50'
-      watch_per:
-        description: 'Watchlist max PER'
+        description: 'Min LLM score (Kiyohara Tier 1)'
         required: false
         default: '40'
       watch_score:
         description: 'Watchlist min score'
         required: false
-        default: '20'
+        default: '10'
       require_profit:
         description: 'Require positive profit (true/false)'
         required: false
@@ -75,15 +67,11 @@ jobs:
           SCREENING_API_URL: ${{ secrets.SCREENING_API_URL }}
           SCREENING_API_TOKEN: ${{ secrets.SCREENING_API_TOKEN }}
           BATCH_SIZE: ${{ inputs.batch_size }}
-          MAX_MARKET_CAP: ${{ inputs.max_market_cap }}
-          MAX_PER: ${{ inputs.max_per }}
+          MIN_QUANT_SCORE: ${{ inputs.min_quant_score }}
           MIN_SCORE: ${{ inputs.min_score }}
-          WATCH_PER: ${{ inputs.watch_per }}
           WATCH_SCORE: ${{ inputs.watch_score }}
           REQUIRE_PROFIT: ${{ inputs.require_profit }}
           SKIP_LOW_GROWTH: ${{ inputs.skip_low_growth }}
           BATCH_INDEX: ${{ inputs.batch_index }}
-          MIN_NET_CASH_RATIO: ${{ inputs.min_net_cash_ratio }}
-          REQUIRE_PER_CAP_RATIO: ${{ inputs.require_per_cap_ratio }}
           ALL_MARKETS: ${{ inputs.all_markets }}
         run: npx tsx scripts/screening.ts
