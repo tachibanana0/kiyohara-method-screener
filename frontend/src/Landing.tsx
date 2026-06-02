@@ -98,20 +98,20 @@ export default function Landing() {
             {[
               {
                 step: '01',
-                title: '定量フィルター',
-                desc: '東証グロース全銘柄から時価総額・実質PER・成長率で絞り込み。J-Quants + Yahoo Finance で毎日最新データを自動取得。',
+                title: '定量スコアリング',
+                desc: 'PER・PBR・ネットキャッシュ比率・小型株の4指標を0-100でスコア化。基準値ではなく総合評価で割安度を測定。',
                 color: 'from-blue-500 to-blue-600',
               },
               {
                 step: '02',
                 title: 'AI 定性評価',
-                desc: 'EDINET 有価証券報告書を Gemini 2.5 Flash が全文解析。創業者経営・大株主持分からオーナー企業か判定し、経営品質を 1-100 でスコア化。',
+                desc: '上位15銘柄のEDINET有価証券報告書を Gemini 2.5 Flash が読解。オーナー企業か判定し、経営品質をスコア化。',
                 color: 'from-amber-500 to-amber-600',
               },
               {
                 step: '03',
                 title: 'Alpha トラッキング',
-                desc: '選定後は毎日株価を取得し日経平均との超過収益率（Alpha）を追跡。清原メソッドの真価＝長期での市場平均アウトパフォームを可視化。',
+                desc: '選定後は毎日株価・日経平均を取得し超過収益率（Alpha）を追跡。清原メソッドの真価＝市場平均アウトパフォームを可視化。',
                 color: 'from-violet-500 to-violet-600',
               },
             ].map((item) => (

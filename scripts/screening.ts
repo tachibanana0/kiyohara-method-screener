@@ -42,6 +42,7 @@ interface QuantScreenedStock {
   latestPrice: number;
   latestTopix: number;
   fiscalYearEnd: string;
+  quantScore: number;
 }
 
 interface LlmEvaluation {
@@ -693,6 +694,7 @@ function computeQuantScore(marketCap: number, realPER: number, ncRatio: number, 
         latestPrice: yf.price,
         latestTopix: topix ?? 0,
         fiscalYearEnd: latest.CurPerEn,
+        quantScore,
       });
 
       console.log(`PASS: ${sym.Code} ${sym.CoName} cap=${marketCap.toFixed(0)}億 PER=${realPER.toFixed(1)} nc=${(netCashRatioFromBS*100).toFixed(0)}% pbr=${pbr.toFixed(1)} score=${quantScore}`);
@@ -703,7 +705,19 @@ function computeQuantScore(marketCap: number, realPER: number, ncRatio: number, 
 
   console.log(`Step 3 complete: ${screened.length} stocks passed`);
 
-  console.log('Step 4: LLM評価');
+  // スコア上位に絞ってLLM評価（時間短縮）
+  const MAX_LLM_EVAL = parseInt(process.env.MAX_LLM_EVAL || '15', 10);
+  screened.sort((a, b) => b.quantScore - a.quantScore);
+  const llmStocks = screened.slice(0, MAX_LLM_EVAL);
+  const restStocks = screened.slice(MAX_LLM_EVAL);
+  if (restStocks.length > 0) {
+    console.log(`${restStocks.length} stocks skipped LLM (score too low), saving quant data only`);
+    for (const s of restStocks) {
+      evaluated.push({ stock: s, eval: { is_owner_company: 0, management_score: 0, reason: 'LLM評価対象外（定量スコア上位' + MAX_LLM_EVAL + '件に限定）。定量データのみ保存。' } });
+    }
+  }
+
+  console.log(`Step 4: LLM評価 (top ${MAX_LLM_EVAL} by score)`);
   const evaluated: Array<{ stock: QuantScreenedStock; eval: LlmEvaluation }> = [];
 
   for (const stock of screened) {

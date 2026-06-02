@@ -143,7 +143,7 @@ export default function Dashboard() {
                 </div>
                 <div className="px-5 py-2.5 bg-gray-50/60 border-t border-gray-100">
                   <p className="text-[11px] text-muted/70 leading-relaxed">
-                    <b>LLM評価:</b> EDINET有価証券報告書全文を Gemini 2.5 Flash で分析。創業家・同族経営のオーナー企業かどうかを判定し、開示品質・戦略記述・ガバナンス記述から経営品質を 1-100 で採点。
+                    <b>LLM評価:</b> 定量スコア上位 15 銘柄のみ EDINET 有価証券報告書を Gemini 2.5 Flash で分析。創業家・同族経営のオーナー企業かどうかを判定。残りは定量データのみ保存。
                   </p>
                 </div>
               </div>
