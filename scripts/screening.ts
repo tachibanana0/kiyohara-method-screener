@@ -608,7 +608,7 @@ const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // 
       }
 
       const latest = statements[statements.length - 1];
-      const shares = latest.ShOutFY || 0;
+      const shares = (latest.ShOutFY || yf.shares || 0);
       if (shares <= 0) {
         console.log(`Skip ${sym.Code}: no shares outstanding`);
         continue;
