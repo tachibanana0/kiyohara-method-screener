@@ -77,26 +77,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchYfinanceBalanceSheet(codes: string[]): Promise<Map<string, any>> {
-  const map = new Map<string, any>();
-  if (codes.length === 0) return map;
-  try {
-    const { execSync } = await import('node:child_process');
-    const scriptPath = 'scripts/yfinance_bs.py';
-    const result = execSync(
-      `python3 ${scriptPath} ${codes.join(' ')}`,
-      { encoding: 'utf-8', timeout: 60000 * Math.max(1, Math.ceil(codes.length / 10)) }
-    );
-    const data = JSON.parse(result);
-    for (const item of data) {
-      map.set(item.code, item);
-    }
-  } catch (err) {
-    console.warn('yfinance BS fetch failed:', err);
-  }
-  return map;
-}
-
 function extractOwnerRelevantSections(docText: string): string {
   const MAX_LEN = 20000;
   const sections: string[] = [];
@@ -243,73 +223,30 @@ class JQuantsClient {
 }
 
 // ============================================
-// Yahoo Finance クライアント
+// Yahoo Finance データ取得 (yfinance経由、ブロック対策)
 // ============================================
 
-interface YahooChartResponse {
-  chart: {
-    result: Array<{
-      indicators: {
-        quote: Array<{ close: number[] }>;
-      };
-    }>;
-  };
-}
-
-class YahooFinanceClient {
-  private async fetchJson<T>(url: string): Promise<T> {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        Accept: 'application/json',
-      },
-    });
-    if (!res.ok) {
-      throw new Error(`Yahoo Finance API error: ${res.status}`);
+async function fetchYfinanceData(codes: string[]): Promise<{ topix: number; stocks: Map<string, any> }> {
+  const stocks = new Map<string, any>();
+  try {
+    const { execSync } = await import('node:child_process');
+    if (codes.length === 0) return { topix: 0, stocks };
+    const result = execSync(
+      `python3 scripts/yfinance_data.py ${codes.join(' ')}`,
+      { encoding: 'utf-8', timeout: 120000 }
+    );
+    const data = JSON.parse(result);
+    if (data.error) {
+      console.warn('yfinance error:', data.error);
+      return { topix: 0, stocks };
     }
-    return res.json() as Promise<T>;
-  }
-
-  async fetchQuote(code: string): Promise<{ close: number } | null> {
-    const trimmed = code.replace(/0$/, '');
-    const ticker = `${trimmed}.T`;
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`;
-    
-    try {
-      const data = await this.fetchJson<YahooChartResponse>(url);
-      const result = data.chart?.result?.[0];
-      const quote = result?.indicators?.quote?.[0];
-      const close = quote?.close?.[0];
-      return close ? { close } : null;
-    } catch (err) {
-      console.warn(`Yahoo quote failed for ${code}:`, err);
-      return null;
+    for (const s of data.stocks || []) {
+      stocks.set(s.code, s);
     }
-  }
-
-  async fetchTopix(): Promise<number | null> {
-    const url = 'https://query1.finance.yahoo.com/v8/finance/chart/^N225?interval=1d&range=1d';
-    try {
-      const data = await this.fetchJson<YahooChartResponse>(url);
-      const result = data.chart?.result?.[0];
-      const quote = result?.indicators?.quote?.[0];
-      return quote?.close?.[0] ?? null;
-    } catch (err) {
-      console.warn('Yahoo TOPIX fetch failed:', err);
-      return null;
-    }
-  }
-
-  async fetchQuotes(codes: string[]): Promise<Map<string, { close: number }>> {
-    const priceMap = new Map<string, { close: number }>();
-    for (const code of codes) {
-      await sleep(100);
-      const quote = await this.fetchQuote(code);
-      if (quote) {
-        priceMap.set(code, quote);
-      }
-    }
-    return priceMap;
+    return { topix: data.topix || 0, stocks };
+  } catch (err) {
+    console.warn('yfinance data fetch failed:', err);
+    return { topix: 0, stocks };
   }
 }
 
@@ -596,8 +533,6 @@ async function runScreening(): Promise<PickResult[]> {
   }
 
   const jquants = new JQuantsClient(jquantsApiKey);
-  const yahoo = new YahooFinanceClient();
-  const edinet = new EdinetClient(edinetSubscriptionKey);
   const openrouter = new OpenRouterClient(openrouterApiKey);
 
   console.log('Step 1: 銘柄マスター取得');
@@ -647,24 +582,110 @@ const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // 
   const batchSymbols = targetSymbols.slice(startIdx, endIdx);
   console.log(`Batch ${batchIndex + 1}/${TOTAL_BATCHES}: processing stocks ${startIdx + 1}-${endIdx} of ${targetSymbols.length}`);
 
-  console.log('Step 2: Yahoo Financeで株価取得');
-  const codes = batchSymbols.map((s) => s.Code);
-  const priceMap = await yahoo.fetchQuotes(codes);
-  console.log(`Fetched Yahoo prices for ${priceMap.size} stocks`);
+  // Step 2: Yahoo Finance データ (yfinance経由、株価・TOPIX・BSを一括取得)
+  console.log('Step 2: Yahoo Finance (yfinance)');
+  const batchCodes = batchSymbols.map((s) => s.Code);
+  const { topix, stocks: yfData } = await fetchYfinanceData(batchCodes);
+  console.log(`Fetched: ${yfData.size} stocks, TOPIX=${topix}`);
 
-  console.log('Step 3: TOPIX取得');
-  const topix = await yahoo.fetchTopix();
-  console.log(`TOPIX: ${topix}`);
-
-  console.log('Step 4: 財務データ取得 & スクリーニング');
+  console.log('Step 3: J-Quants 財務データ & スクリーニング');
   const screened: QuantScreenedStock[] = [];
 
   for (const sym of batchSymbols) {
-    const priceData = priceMap.get(sym.Code);
-    if (!priceData) {
-      console.log(`Skip ${sym.Code}: no price data`);
+    const yf = yfData.get(sym.Code);
+    if (!yf || yf.error || !yf.price) {
+      if (yf?.error) console.log(`Skip ${sym.Code}: yfinance error`);
+      else console.log(`Skip ${sym.Code}: no price data`);
       continue;
     }
+
+    try {
+      await sleep(3000); // J-Quants rate limit: 3 req/min for free tier
+      let statements = await jquants.fetchStatements(sym.Code);
+
+      if (statements.length === 0) {
+        console.log(`Skip ${sym.Code}: no J-Quants financial data`);
+        continue;
+      }
+
+      const latest = statements[statements.length - 1];
+      const shares = latest.ShOutFY || 0;
+      if (shares <= 0) {
+        console.log(`Skip ${sym.Code}: no shares outstanding`);
+        continue;
+      }
+
+      // Use yfinance market cap if available, fallback to price*shares
+      const marketCap = yf.market_cap > 0
+        ? yf.market_cap / 1e8
+        : (yf.price * shares) / 1e8;
+      if (marketCap > MAX_MARKET_CAP) {
+        console.log(`Skip ${sym.Code}: market cap ${marketCap.toFixed(1)}億円 > ${MAX_MARKET_CAP}億円`);
+        continue;
+      }
+
+      const profit = latest.NP || 0;
+      if (REQUIRE_PROFIT && profit <= 0) {
+        console.log(`Skip ${sym.Code}: no profit`);
+        continue;
+      }
+
+      // 実質PER — 本の基準に従い、ネットキャッシュ比率が使えるならそちらも考慮
+      const netCashFromBS = yf.net_cash > 0 ? yf.net_cash / 1e8 : 0;
+      const netCashRatioFromBS = yf.net_cash_ratio || 0;
+      const netCash = netCashFromBS > 0 ? netCashFromBS : ((latest.CashEq || 0) / 1e8);
+      const realPER = (marketCap - netCash) / (profit / 1e8);
+
+      if (realPER > MAX_PER || realPER <= 0) {
+        console.log(`Skip ${sym.Code}: realPER ${realPER.toFixed(1)} > ${MAX_PER}`);
+        continue;
+      }
+
+      // 清原基準: PER < 時価総額/100
+      if (REQUIRE_PER_CAP_RATIO && realPER >= marketCap / 100) {
+        console.log(`Skip ${sym.Code}: PER ${realPER.toFixed(1)} >= cap/100 = ${(marketCap / 100).toFixed(1)}`);
+        continue;
+      }
+
+      // ネットキャッシュ比率チェック（yfinance BSデータがある場合のみ）
+      if (netCashFromBS > 0 && netCashRatioFromBS < MIN_NET_CASH_RATIO) {
+        console.log(`Skip ${sym.Code}: net cash ratio ${(netCashRatioFromBS * 100).toFixed(1)}% < ${(MIN_NET_CASH_RATIO * 100).toFixed(0)}%`);
+        continue;
+      }
+
+      let salesGrowth = 0;
+      let profitGrowth = 0;
+      if (statements.length >= 3) {
+        const last3 = statements.slice(-3);
+        salesGrowth = avgGrowthRate(last3.map((s) => s.Sales));
+        profitGrowth = avgGrowthRate(last3.map((s) => s.OP));
+        if (SKIP_LOW_GROWTH && (salesGrowth <= 0 || profitGrowth <= 0)) {
+          console.log(`Skip ${sym.Code}: insufficient growth`);
+          continue;
+        }
+      }
+
+      screened.push({
+        code: sym.Code,
+        name: sym.CoName,
+        marketCap,
+        netCash,
+        netCashRatio: netCashRatioFromBS,
+        realPER,
+        salesGrowth3Y: salesGrowth,
+        profitGrowth3Y: profitGrowth,
+        latestPrice: yf.price,
+        latestTopix: topix ?? 0,
+        fiscalYearEnd: latest.CurPerEn,
+      });
+
+      console.log(`PASS: ${sym.Code} ${sym.CoName} cap=${marketCap.toFixed(1)}B PER=${realPER.toFixed(1)} ncRatio=${(netCashRatioFromBS * 100).toFixed(0)}%`);
+    } catch (err) {
+      console.warn(`Screening failed for ${sym.Code}:`, err);
+    }
+  }
+
+  console.log(`Step 3 complete: ${screened.length} stocks passed`);
 
     try {
       await sleep(3000); // J-Quants rate limit: 3 req/min for free tier
@@ -742,33 +763,7 @@ const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // 
     }
   }
 
-  console.log(`Step 4 complete: ${screened.length} stocks passed J-Quants screening`);
-
-  // Step 4.5: yfinance BS で正確なネットキャッシュ比率を計算
-  if (screened.length > 0 && process.env.SKIP_YFINANCE !== 'true') {
-    console.log('Step 4.5: yfinance Balance Sheet取得');
-    const yfMap = await fetchYfinanceBalanceSheet(screened.map(s => s.code));
-    const screenedWithBS = screened.map(s => {
-      const yf = yfMap.get(s.code);
-      if (yf && yf.net_cash_ratio != null && !yf.error) {
-        s.netCashRatio = yf.net_cash_ratio;
-        s.netCash = yf.net_cash > 0 ? yf.net_cash / 1e8 : s.netCash;
-      }
-      return s;
-    });
-
-    // ネットキャッシュ比率フィルタ（本の基準: ≥1.0）
-    const screenedFinal = screenedWithBS.filter(s => {
-      if (s.netCashRatio >= MIN_NET_CASH_RATIO) return true;
-      console.log(`Skip ${s.code}: net cash ratio ${(s.netCashRatio * 100).toFixed(1)}% < ${(MIN_NET_CASH_RATIO * 100).toFixed(0)}%`);
-      return false;
-    });
-    screened.length = 0;
-    screened.push(...screenedFinal);
-    console.log(`After yfinance BS filter: ${screened.length} stocks (net cash ratio >= ${(MIN_NET_CASH_RATIO * 100).toFixed(0)}%)`);
-  }
-
-  console.log('Step 5: LLM評価');
+  console.log('Step 4: LLM評価');
   const evaluated: Array<{ stock: QuantScreenedStock; eval: LlmEvaluation }> = [];
 
   for (const stock of screened) {
