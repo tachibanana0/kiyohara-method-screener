@@ -581,7 +581,7 @@ const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // 
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
   const batchIndexFromEnv = process.env.BATCH_INDEX;
-  const batchIndex = batchIndexFromEnv != null
+  const batchIndex = batchIndexFromEnv
     ? parseInt(batchIndexFromEnv, 10)
     : (BATCH_SIZE === 50 ? (dayOfWeek - 1 + TOTAL_BATCHES) % TOTAL_BATCHES : 0);
   const startIdx = batchIndex * BATCH_SIZE;
