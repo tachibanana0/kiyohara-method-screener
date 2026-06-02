@@ -228,15 +228,19 @@ class JQuantsClient {
 
 async function fetchYfinanceData(codes: string[]): Promise<{ topix: number; stocks: Map<string, any> }> {
   const stocks = new Map<string, any>();
-  if (codes.length === 0) return { topix: 0, stocks };
+  console.log(`YFINANCE DEBUG: got ${codes.length} codes`);
+  if (codes.length === 0) {
+    console.log('YFINANCE DEBUG: no codes, returning empty');
+    return { topix: 0, stocks };
+  }
   try {
-    // Use require (not dynamic import) for execSync in tsx
+    console.log('YFINANCE DEBUG: calling execSync...');
+    // @ts-ignore - require is available in tsx/Node.js runtime
     const { execSync } = require('child_process');
-    console.log(`Calling yfinance for ${codes.length} stocks...`);
-    const result = execSync(
-      `python3 scripts/yfinance_data.py ${codes.join(' ')}`,
-      { encoding: 'utf-8', stdio: 'pipe', timeout: 120000 }
-    );
+    const cmd = `python3 scripts/yfinance_data.py ${codes.join(' ')}`;
+    console.log(`YFINANCE DEBUG: ${cmd.slice(0, 100)}...`);
+    const result = execSync(cmd, { encoding: 'utf-8', timeout: 120000 });
+    console.log('YFINANCE DEBUG: execSync succeeded');
     const data = JSON.parse(result);
     if (data.error) {
       console.warn('yfinance error:', data.error);
@@ -248,7 +252,7 @@ async function fetchYfinanceData(codes: string[]): Promise<{ topix: number; stoc
     console.log(`yfinance returned: ${stocks.size} stocks, TOPIX=${data.topix}`);
     return { topix: data.topix || 0, stocks };
   } catch (err: any) {
-    console.warn('yfinance data fetch failed:', err.message || err, err.stderr || '');
+    console.warn('YFINANCE DEBUG catch:', err && err.message ? err.message : String(err));
     return { topix: 0, stocks };
   }
 }
