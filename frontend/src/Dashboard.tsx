@@ -12,6 +12,7 @@ interface Pick {
   name: string;
   market_cap: number;
   net_cash: number;
+  net_cash_ratio: number;
   real_per: number;
   sales_growth: number | null;
   profit_growth: number | null;
