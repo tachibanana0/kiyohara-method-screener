@@ -42,7 +42,7 @@ on:
       min_net_cash_ratio:
         description: 'Minimum net cash ratio (e.g. 0.05 = 5%)'
         required: false
-        default: '0.05'
+        default: '1.0'
       require_per_cap_ratio:
         description: 'Require PER < cap/100'
         required: false
@@ -65,6 +65,8 @@ jobs:
         with:
           node-version: '20'
       - run: npm install
+      - name: Install yfinance
+        run: pip install yfinance
       - name: Run Screening
         env:
           JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}

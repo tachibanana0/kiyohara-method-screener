@@ -18,6 +18,8 @@ jobs:
         with:
           node-version: '20'
       - run: npm install
+      - name: Install yfinance
+        run: pip install yfinance
       - name: Run Screening
         env:
           JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}

@@ -77,6 +77,26 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function fetchYfinanceBalanceSheet(codes: string[]): Promise<Map<string, any>> {
+  const map = new Map<string, any>();
+  if (codes.length === 0) return map;
+  try {
+    const { execSync } = await import('node:child_process');
+    const scriptPath = 'scripts/yfinance_bs.py';
+    const result = execSync(
+      `python3 ${scriptPath} ${codes.join(' ')}`,
+      { encoding: 'utf-8', timeout: 60000 * Math.max(1, Math.ceil(codes.length / 10)) }
+    );
+    const data = JSON.parse(result);
+    for (const item of data) {
+      map.set(item.code, item);
+    }
+  } catch (err) {
+    console.warn('yfinance BS fetch failed:', err);
+  }
+  return map;
+}
+
 function extractOwnerRelevantSections(docText: string): string {
   const MAX_LEN = 20000;
   const sections: string[] = [];
@@ -609,7 +629,7 @@ async function runScreening(): Promise<PickResult[]> {
 const MAX_MARKET_CAP = parseInt(process.env.MAX_MARKET_CAP || '270', 10);
 const MAX_PER = parseInt(process.env.MAX_PER || '25', 10);
 const MIN_SCORE = parseInt(process.env.MIN_SCORE || '50', 10);
-const MIN_NET_CASH_RATIO = parseFloat(process.env.MIN_NET_CASH_RATIO || '0.05'); // ネットキャッシュ比率5%以上
+const MIN_NET_CASH_RATIO = parseFloat(process.env.MIN_NET_CASH_RATIO || '1.0'); // ネットキャッシュ比率100%以上（清原本基準）
 // 監視対象 (Watchlist) — 清原基準から外れても拾う閾値
 const WATCH_PER = parseInt(process.env.WATCH_PER || '40', 10);
 const WATCH_SCORE = parseInt(process.env.WATCH_SCORE || '20', 10);
@@ -670,14 +690,7 @@ const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // 
 
       const cash = latest.CashEq || 0;
       const netCash = cash / 1e8;
-      const netCashRatio = marketCap > 0 ? netCash / marketCap : 0;
-
-      // 清原基準: ネットキャッシュ比率チェック（CashEqのデータがある場合のみ）
-      const hasCashData = cash > 0; // CashEqが0ならJ-Quants無料APIがデータ未返却 = 不明扱い
-      if (hasCashData && netCashRatio < MIN_NET_CASH_RATIO) {
-        console.log(`Skip ${sym.Code}: net cash ratio ${(netCashRatio * 100).toFixed(1)}% < ${(MIN_NET_CASH_RATIO * 100).toFixed(0)}%`);
-        continue;
-      }
+      // J-Quants CashEq is unreliable. Net cash ratio will be checked via yfinance BS later
 
       const profit = latest.NP || 0;
       if (REQUIRE_PROFIT && profit <= 0) {
@@ -729,7 +742,31 @@ const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // 
     }
   }
 
-  console.log(`Step 4 complete: ${screened.length} stocks passed quantitative screening`);
+  console.log(`Step 4 complete: ${screened.length} stocks passed J-Quants screening`);
+
+  // Step 4.5: yfinance BS で正確なネットキャッシュ比率を計算
+  if (screened.length > 0 && process.env.SKIP_YFINANCE !== 'true') {
+    console.log('Step 4.5: yfinance Balance Sheet取得');
+    const yfMap = await fetchYfinanceBalanceSheet(screened.map(s => s.code));
+    const screenedWithBS = screened.map(s => {
+      const yf = yfMap.get(s.code);
+      if (yf && yf.net_cash_ratio != null && !yf.error) {
+        s.netCashRatio = yf.net_cash_ratio;
+        s.netCash = yf.net_cash > 0 ? yf.net_cash / 1e8 : s.netCash;
+      }
+      return s;
+    });
+
+    // ネットキャッシュ比率フィルタ（本の基準: ≥1.0）
+    const screenedFinal = screenedWithBS.filter(s => {
+      if (s.netCashRatio >= MIN_NET_CASH_RATIO) return true;
+      console.log(`Skip ${s.code}: net cash ratio ${(s.netCashRatio * 100).toFixed(1)}% < ${(MIN_NET_CASH_RATIO * 100).toFixed(0)}%`);
+      return false;
+    });
+    screened.length = 0;
+    screened.push(...screenedFinal);
+    console.log(`After yfinance BS filter: ${screened.length} stocks (net cash ratio >= ${(MIN_NET_CASH_RATIO * 100).toFixed(0)}%)`);
+  }
 
   console.log('Step 5: LLM評価');
   const evaluated: Array<{ stock: QuantScreenedStock; eval: LlmEvaluation }> = [];
