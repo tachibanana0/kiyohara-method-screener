@@ -50,9 +50,18 @@ def get_stock_data(code: str) -> dict:
                 current_assets = val("Total Assets")
 
             total_liabilities = val("Total Liabilities Net Minority Interest")
+            total_equity = val("Total Equity Gross Minority Interest")
+            if total_equity == 0:
+                total_equity = val("Stockholders Equity")
 
             net_cash = current_assets + (securities * 0.70) - total_liabilities
             net_cash_ratio = round(net_cash / market_cap, 4) if market_cap > 0 else 0
+            book_per_share = total_equity / shares if shares > 0 else 0
+            pbr = round(float(price) / book_per_share, 2) if book_per_share > 0 else 0
+        else:
+            book_per_share = 0
+            pbr = 0
+            total_equity = 0
 
         return {
             "code": code,
@@ -61,6 +70,7 @@ def get_stock_data(code: str) -> dict:
             "shares": int(shares),
             "net_cash": net_cash,
             "net_cash_ratio": net_cash_ratio,
+            "pbr": pbr,
         }
     except Exception as e:
         return {"code": code, "error": str(e), "price": 0, "net_cash_ratio": 0}

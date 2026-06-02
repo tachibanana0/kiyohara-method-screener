@@ -571,6 +571,7 @@ const WATCH_SCORE = parseInt(process.env.WATCH_SCORE || '20', 10);
 // 定量フィルターの緩衝閾値
 const REQUIRE_PROFIT = process.env.REQUIRE_PROFIT !== 'false';  // true by default
 const SKIP_LOW_GROWTH = process.env.SKIP_LOW_GROWTH !== 'false'; // true by default
+const MAX_PBR = parseFloat(process.env.MAX_PBR || '1.0'); // PBR <= 1.0（清原基準）
 const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // PER < cap/100 (清原基準、デフォルト有効)
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
@@ -655,6 +656,13 @@ const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // 
         continue;
       }
 
+      // PBR チェック（yfinance BSデータがある場合のみ）
+      const pbr = yf.pbr || 0;
+      if (pbr > 0 && pbr > MAX_PBR) {
+        console.log(`Skip ${sym.Code}: PBR ${pbr.toFixed(2)} > ${MAX_PBR}`);
+        continue;
+      }
+
       let salesGrowth = 0;
       let profitGrowth = 0;
       if (statements.length >= 3) {
@@ -697,7 +705,12 @@ const REQUIRE_PER_CAP_RATIO = process.env.REQUIRE_PER_CAP_RATIO !== 'false'; // 
       const edinetCode = edinetCodeMap.get(stock.code);
       const reports = await edinet.fetchLatestYukashokenReports(stock.code, stock.name, edinetCode, stock.fiscalYearEnd);
       if (reports.length === 0) {
-        console.log(`Skip ${stock.code}: no EDINET reports`);
+        console.log(`Skip ${stock.code}: no EDINET reports (saving quantitative data only)`);
+        // Save without LLM evaluation — quantitative data still valuable
+        evaluated.push({
+          stock,
+          eval: { is_owner_company: 0, management_score: 0, reason: 'EDINET報告書が見つかりませんでした。定量的なネットキャッシュ比率・PER等は有効です。' },
+        });
         continue;
       }
 

@@ -27,4 +27,5 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           SCREENING_API_URL: ${{ secrets.SCREENING_API_URL }}
           SCREENING_API_TOKEN: ${{ secrets.SCREENING_API_TOKEN }}
+          ALL_MARKETS: 'true'
         run: npx tsx scripts/screening.ts
