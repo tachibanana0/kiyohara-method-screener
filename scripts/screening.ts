@@ -602,6 +602,7 @@ function computeQuantScore(marketCap: number, realPER: number, ncRatio: number, 
 }
   const today = new Date();
   const utcHour = today.getUTCHours();
+  const batchIndexFromEnv = process.env.BATCH_INDEX;
   // 4時間毎の実行 → 1日6バッチ。全12バッチを2日で網羅
   const hourlyBatch = Math.floor(utcHour / 4); // 0-5
   const batchIndex = batchIndexFromEnv
