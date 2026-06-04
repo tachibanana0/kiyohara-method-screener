@@ -559,7 +559,7 @@ async function runScreening(): Promise<PickResult[]> {
   const edinetCodeMap = new Map<string, string>();
 
   // バッチ処理: ALL_MARKETS有効時はカバレッジが広いためバッチ数を増やす
-  const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '50', 10);
+  const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '25', 10);
   const TOTAL_BATCHES = ALL_MARKETS ? 12 : 5; // 全市場の場合は12バッチ(3倍)に分割
 // 選定基準 — 清原達郎『わが投資術』に基づくスコア制
 // 本には一律閾値が明記されていないため、スコア制に変更
@@ -631,7 +631,7 @@ function computeQuantScore(marketCap: number, realPER: number, ncRatio: number, 
     }
 
     try {
-      await sleep(3000); // J-Quants rate limit: 3 req/min for free tier
+      await sleep(20000); // J-Quants rate limit: 3 req/min = 20s interval
       let statements = await jquants.fetchStatements(sym.Code);
 
       if (statements.length === 0) {
