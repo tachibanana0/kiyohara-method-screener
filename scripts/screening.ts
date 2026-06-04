@@ -707,6 +707,8 @@ function computeQuantScore(marketCap: number, realPER: number, ncRatio: number, 
 
   console.log(`Step 3 complete: ${screened.length} stocks passed`);
 
+  const evaluated: Array<{ stock: QuantScreenedStock; eval: LlmEvaluation }> = [];
+
   // スコア上位に絞ってLLM評価（時間短縮）
   const MAX_LLM_EVAL = parseInt(process.env.MAX_LLM_EVAL || '15', 10);
   screened.sort((a, b) => b.quantScore - a.quantScore);
@@ -720,9 +722,8 @@ function computeQuantScore(marketCap: number, realPER: number, ncRatio: number, 
   }
 
   console.log(`Step 4: LLM評価 (top ${MAX_LLM_EVAL} by score)`);
-  const evaluated: Array<{ stock: QuantScreenedStock; eval: LlmEvaluation }> = [];
 
-  for (const stock of screened) {
+  for (const stock of llmStocks) {
     try {
       const edinetCode = edinetCodeMap.get(stock.code);
       const reports = await edinet.fetchLatestYukashokenReports(stock.code, stock.name, edinetCode, stock.fiscalYearEnd);
