@@ -559,8 +559,8 @@ async function runScreening(): Promise<PickResult[]> {
   const edinetCodeMap = new Map<string, string>();
 
   // バッチ処理: ALL_MARKETS有効時はカバレッジが広いためバッチ数を増やす
-  const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '25', 10);
-  const TOTAL_BATCHES = ALL_MARKETS ? 12 : 5; // 全市場の場合は12バッチ(3倍)に分割
+  const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '50', 10);
+  const TOTAL_BATCHES = Math.ceil(targetSymbols.length / BATCH_SIZE);
 // 選定基準 — 清原達郎『わが投資術』に基づくスコア制
 // 本には一律閾値が明記されていないため、スコア制に変更
 const MIN_QUANT_SCORE = parseInt(process.env.MIN_QUANT_SCORE || '20', 10); // 定量スコア最低ライン
