@@ -44,6 +44,10 @@ on:
         required: false
         default: 'false'
 
+concurrency:
+  group: jquants-limit
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
