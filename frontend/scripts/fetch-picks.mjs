@@ -2,7 +2,7 @@
 import { writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const API_BASE = process.env.VITE_API_BASE || process.env.SCREENING_API_URL || 'https://kiyohara-method-screener.tachibanananana.workers.dev';
+const API_BASE = process.env.SCREENING_API_URL || process.env.VITE_API_BASE || 'https://kiyohara-method-screener.tachibanananana.workers.dev';
 const TOKEN = process.env.SCREENING_API_TOKEN || '';
 const OUT_FILE = resolve(process.cwd(), '.picks-cache.json');
 const SITEMAP_FILE = resolve(process.cwd(), 'public', 'sitemap.xml');
