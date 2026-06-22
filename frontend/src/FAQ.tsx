@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import { Head } from 'vite-react-ssg';
 
 const faqs = [
   { q: '清原メソッド・スクリーナーは無料ですか？', a: 'はい、完全無料です。Cloudflare Workers の無料枠と GitHub Actions の無料枠で運用しています。API キー（J-Quants・EDINET・OpenRouter）の取得もすべて無料で行えます。' },
@@ -15,10 +15,10 @@ const faqs = [
 export default function FAQ() {
   return (
     <div className="min-h-screen bg-[#080c14] text-white">
-      <Helmet>
+      <Head>
         <title>よくある質問 | 清原メソッド・スクリーナー</title>
         <meta name="description" content="清原メソッド・スクリーナーのよくある質問。無料ですか？AI判定の精度は？データ更新頻度は？などの疑問にお答えします。" />
-      </Helmet>
+      </Head>
       <header className="border-b border-white/5 px-6 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <Link to="/" className="text-sm text-gray-400 hover:text-white transition-colors">← トップ</Link>

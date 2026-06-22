@@ -1,11 +1,27 @@
 /// <reference types="vite/client" />
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import { Link, useLoaderData } from 'react-router-dom';
+import { Head } from 'vite-react-ssg';
 import PickList from './components/PickList';
 import PerformanceChart from './components/PerformanceChart';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
+
+export async function loader(): Promise<{ picks: Pick[] }> {
+  if (typeof window !== 'undefined') {
+    return { picks: [] };
+  }
+  try {
+    const { readFileSync, existsSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const picksFile = resolve(process.cwd(), '.picks-cache.json');
+    if (!existsSync(picksFile)) return { picks: [] };
+    const data = JSON.parse(readFileSync(picksFile, 'utf-8')) as Pick[];
+    return { picks: Array.isArray(data) ? data : [] };
+  } catch {
+    return { picks: [] };
+  }
+}
 
 interface Pick {
   code: string;
@@ -53,11 +69,16 @@ function Skeleton() {
 }
 
 export default function Dashboard() {
-  const [picks, setPicks] = useState<Pick[]>([]);
-  const [selectedCode, setSelectedCode] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const loaderData = useLoaderData() as { picks: Pick[] } | undefined;
+  const initialPicks = loaderData?.picks ?? [];
+  const [picks, setPicks] = useState<Pick[]>(initialPicks);
+  const [selectedCode, setSelectedCode] = useState<string | null>(
+    initialPicks.length > 0 ? initialPicks[0].code : null
+  );
+  const [loading, setLoading] = useState(initialPicks.length === 0);
 
   useEffect(() => {
+    if (initialPicks.length > 0) return;
     fetch(`${API_BASE}/api/picks`)
       .then((r) => r.json())
       .then((data: Pick[]) => {
@@ -69,7 +90,7 @@ export default function Dashboard() {
         console.error(err);
         setLoading(false);
       });
-  }, []);
+  }, [initialPicks.length]);
 
   const avgPER = picks.length
     ? picks.reduce((s, p) => s + p.real_per, 0) / picks.length
@@ -81,10 +102,10 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Helmet>
-        <title>{picks.length > 0 ? `選定銘柄一覧（${picks.length}件）` : '選定銘柄一覧'} | 清原メソッド・スクリーナー</title>
+      <Head>
+        <title>{`選定銘柄一覧（${picks.length}件） | 清原メソッド・スクリーナー`}</title>
         <meta name="description" content={`清原メソッドによるスクリーニング結果。${picks.length}件の選定銘柄（清原適合${compliantCount}件・監視対象${watchCount}件）の詳細データを閲覧できます。`} />
-      </Helmet>
+      </Head>
       <header className="bg-primary text-white">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>

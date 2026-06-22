@@ -15,6 +15,16 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: false,
+  },
+  ssgOptions: {
+    entry: 'src/main.tsx',
+    script: 'async',
+    formatting: 'none',
+    dirStyle: 'flat',
+    beastiesOptions: {
+      preload: 'media',
+      fonts: true,
+    },
   },
 });

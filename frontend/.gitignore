@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.picks-cache.json
+.env
+.env.local
+*.log
+.DS_Store
+.vite/
+.vite-react-ssg-temp/

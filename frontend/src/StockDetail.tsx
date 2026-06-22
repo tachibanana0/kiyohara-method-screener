@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import { Link, useLoaderData, useParams } from 'react-router-dom';
+import { Head } from 'vite-react-ssg';
 import PerformanceChart from './components/PerformanceChart';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
@@ -12,12 +12,32 @@ interface Pick {
   initial_price: number | null; kiyohara_compliant: number; reason: string; status: string;
 }
 
+export async function loader({ params }: { params: { code?: string } }): Promise<{ pick: Pick | null }> {
+  if (typeof window !== 'undefined') {
+    return { pick: null };
+  }
+  try {
+    const { readFileSync, existsSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const picksFile = resolve(process.cwd(), '.picks-cache.json');
+    if (!existsSync(picksFile)) return { pick: null };
+    const data = JSON.parse(readFileSync(picksFile, 'utf-8')) as Pick[];
+    const pick = Array.isArray(data) ? data.find((p) => p.code === params.code) || null : null;
+    return { pick };
+  } catch {
+    return { pick: null };
+  }
+}
+
 export default function StockDetail() {
   const { code } = useParams<{ code: string }>();
-  const [pick, setPick] = useState<Pick | null>(null);
-  const [loading, setLoading] = useState(true);
+  const loaderData = useLoaderData() as { pick: Pick | null } | undefined;
+  const initialPick = loaderData?.pick ?? null;
+  const [pick, setPick] = useState<Pick | null>(initialPick);
+  const [loading, setLoading] = useState(!initialPick);
 
   useEffect(() => {
+    if (initialPick) return;
     fetch(`${API_BASE}/api/picks`)
       .then((r) => r.json())
       .then((data: Pick[]) => {
@@ -26,7 +46,7 @@ export default function StockDetail() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [code]);
+  }, [code, initialPick]);
 
   if (loading) return <div className="min-h-screen bg-surface flex items-center justify-center"><div className="animate-spin w-6 h-6 border-2 border-amber-500/30 border-t-amber-500 rounded-full" /></div>;
   if (!pick) return <div className="min-h-screen bg-surface flex items-center justify-center text-muted">銘柄が見つかりません</div>;
@@ -35,10 +55,10 @@ export default function StockDetail() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Helmet>
-        <title>{pick.code} {pick.name}（{pick.kiyohara_compliant ? '清原適合' : '監視対象'}）PER{pick.real_per.toFixed(1)}倍 スコア{pick.management_score} | 清原メソッド</title>
+      <Head>
+        <title>{`${pick.code} ${pick.name}（${pick.kiyohara_compliant ? '清原適合' : '監視対象'}）PER${pick.real_per.toFixed(1)}倍 スコア${pick.management_score} | 清原メソッド`}</title>
         <meta name="description" content={`${pick.name}(${pick.code}) — 実質PER ${pick.real_per.toFixed(1)}倍、時価総額 ${pick.market_cap.toFixed(0)}億円、経営スコア ${pick.management_score}/100。${pick.kiyohara_compliant ? '清原メソッドの全基準を満たす適合銘柄。' : '監視対象銘柄。'}${pick.reason ? ' AI評価: ' + pick.reason.slice(0, 100) : ''}`} />
-      </Helmet>
+      </Head>
       <header className="bg-primary text-white">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-4">
           <Link to="/dashboard" className="text-xs text-gray-500 hover:text-gray-300 transition-colors">← 一覧</Link>

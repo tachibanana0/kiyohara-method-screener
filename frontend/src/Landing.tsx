@@ -1,28 +1,72 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import { Link, useLoaderData } from 'react-router-dom';
+import { Head } from 'vite-react-ssg';
 
 const API_BASE = import.meta.env.VITE_API_BASE || '';
 
+interface Pick {
+  code: string;
+  name: string;
+  market_cap: number;
+  real_per: number;
+  kiyohara_compliant: number;
+  management_score: number;
+}
+
+export async function loader(): Promise<{ preview: Pick[]; stats: { total: number; compliant: number; watch: number } }> {
+  if (typeof window !== 'undefined') {
+    return { preview: [], stats: { total: 0, compliant: 0, watch: 0 } };
+  }
+  try {
+    const { readFileSync, existsSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const picksFile = resolve(process.cwd(), '.picks-cache.json');
+    if (!existsSync(picksFile)) return { preview: [], stats: { total: 0, compliant: 0, watch: 0 } };
+    const data = JSON.parse(readFileSync(picksFile, 'utf-8')) as Pick[];
+    const picks = Array.isArray(data) ? data : [];
+    const compliant = picks.filter((p) => p.kiyohara_compliant).length;
+    const preview = picks.slice(0, 8).map((p) => ({
+      code: p.code,
+      name: p.name,
+      market_cap: p.market_cap,
+      real_per: p.real_per,
+      kiyohara_compliant: p.kiyohara_compliant,
+      management_score: p.management_score,
+    }));
+    return { preview, stats: { total: picks.length, compliant, watch: picks.length - compliant } };
+  } catch {
+    return { preview: [], stats: { total: 0, compliant: 0, watch: 0 } };
+  }
+}
+
 export default function Landing() {
-  const [picks, setPicks] = useState<any[]>([]);
+  const loaderData = useLoaderData() as { preview: Pick[]; stats: { total: number; compliant: number; watch: number } } | undefined;
+  const initialPreview = loaderData?.preview ?? [];
+  const initialStats = loaderData?.stats ?? { total: 0, compliant: 0, watch: 0 };
+  const [preview, setPreview] = useState<Pick[]>(initialPreview);
+  const [stats, setStats] = useState(initialStats);
 
   useEffect(() => {
+    if (initialPreview.length > 0) return;
     fetch(`${API_BASE}/api/picks`)
       .then((r) => r.json())
-      .then((data) => setPicks(data))
+      .then((data) => {
+        setPreview(data.slice(0, 8));
+        const compliant = data.filter((p: Pick) => p.kiyohara_compliant).length;
+        setStats({ total: data.length, compliant, watch: data.length - compliant });
+      })
       .catch(() => {});
-  }, []);
+  }, [initialPreview.length]);
 
-  const compliant = picks.filter((p) => p.kiyohara_compliant).length;
-  const watch = picks.length - compliant;
+  const compliant = stats.compliant;
+  const watch = stats.watch;
 
   return (
     <div className="min-h-screen bg-[#080c14] text-white overflow-x-hidden">
-      <Helmet>
+      <Head>
         <title>【完全無料】清原メソッド・スクリーナー | AIが割安小型成長株を毎日自動選定</title>
         <meta name="description" content="東証グロース全250銘柄を毎日AIがスクリーニング。時価総額2,000億円以下・実質PER・ネットキャッシュ・成長率から割安小型成長株を発掘し、オーナー企業を判定。選定後は超過収益Alphaをトラッキング。清原達郎「わが投資術」の実践を完全自動化。" />
-      </Helmet>
+      </Head>
       {/* Hero */}
       <section className="relative min-h-screen flex items-center justify-center px-6 py-24">
         <div className="absolute inset-0 bg-gradient-to-b from-blue-950/40 via-transparent to-[#080c14]" />
@@ -30,7 +74,7 @@ export default function Landing() {
         <div className="relative z-10 max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-gray-400 mb-8 animate-fadeInUp">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            現在 {picks.length} 銘柄をトラッキング中
+            現在 {stats.total} 銘柄をトラッキング中
           </div>
 
           <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.05] mb-6 animate-fadeInUp delay-100">
@@ -63,10 +107,10 @@ export default function Landing() {
             </a>
           </div>
 
-          {picks.length > 0 && (
+          {stats.total > 0 && (
             <div className="grid grid-cols-3 gap-6 max-w-md mx-auto mt-16 pt-12 border-t border-white/5 animate-fadeInUp delay-400">
               <div className="text-center">
-                <div className="text-3xl font-bold text-white tabular-nums">{picks.length}</div>
+                <div className="text-3xl font-bold text-white tabular-nums">{stats.total}</div>
                 <div className="text-xs text-gray-500 mt-1">選定銘柄</div>
               </div>
               <div className="text-center">
@@ -197,7 +241,7 @@ export default function Landing() {
       </section>
 
       {/* Pick Preview */}
-      {picks.length > 0 && (
+      {stats.total > 0 && (
         <section className="relative px-6 py-32">
           <div className="max-w-4xl mx-auto text-center mb-16">
             <span className="text-xs tracking-[0.2em] uppercase text-amber-500 font-semibold mb-4 block">
@@ -222,7 +266,7 @@ export default function Landing() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {picks.slice(0, 8).map((pick) => (
+                {preview.map((pick) => (
                   <tr key={pick.code} className="hover:bg-white/[0.02] transition-colors">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
@@ -259,7 +303,7 @@ export default function Landing() {
               to="/dashboard"
               className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-white/5 border border-white/10 text-sm font-medium text-gray-300 hover:bg-white/10 hover:text-white transition-all"
             >
-              全 {picks.length} 銘柄の詳細を見る →
+              全 {stats.total} 銘柄の詳細を見る →
             </Link>
           </div>
         </section>
