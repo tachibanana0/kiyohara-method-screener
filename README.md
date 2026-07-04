@@ -50,13 +50,14 @@ Cloudflare Workers (Hono v4)
   ├── POST /api/tracking/receive  ← トラッキング結果受信
   └── D1 Database (kiyohara-screener-db)
 
-Cloudflare Pages (React 19 + Vite + Tailwind v4 + Recharts)
-  ├── /                ← ランディングページ
-  ├── /dashboard       ← 選定銘柄一覧 + パフォーマンスチャート
-  ├── /picks/:code     ← 個別銘柄詳細
-  ├── /method          ← 清原メソッド詳細解説
-  ├── /faq             ← FAQ
-  └── /about           ← 運営者情報
+Cloudflare Pages (React 19 + Vite + Tailwind v4 + Recharts + vite-react-ssg)
+  ├── /                ← ランディングページ（SSG）
+  ├── /dashboard       ← 選定銘柄一覧 + パフォーマンスチャート（SSG）
+  ├── /picks/:code     ← 個別銘柄詳細（SSG、900ページ）
+  ├── /method          ← 清原メソッド詳細解説（SSG）
+  ├── /faq             ← FAQ（SSG）
+  ├── /about           ← 運営者情報（SSG）
+  └── /sitemap.xml     ← 905 URLの静的サイトマップ（ビルド時生成）
 ```
 
 ## 技術スタック
@@ -128,7 +129,7 @@ npm run tracking
 ### デプロイ
 ```bash
 npm run deploy  # Worker
-cd frontend && npm run build && npx wrangler pages deploy dist --project-name=kiyohara-screener --branch=main --commit-dirty=true
+cd frontend && npm run build:prerender && npx wrangler pages deploy dist --project-name=kiyohara-screener --branch=main --commit-dirty=true
 ```
 
 ## スクリーニングパイプライン
@@ -186,6 +187,37 @@ code, doc_id, submitted_date, is_owner_company, management_score, reason
 
 React 19 + Vite + Tailwind v4 + Recharts + react-helmet-async + react-router-dom。
 
+### SSG（Static Site Generation）
+
+2026年6月、SPAからSSGに移行し、SEOと初期表示速度を大幅改善。
+
+**技術:**
+- `vite-react-ssg` + `beasties` でビルド時に全ページをプリレンダリング
+- 905ページ生成（index, dashboard, method, faq, about, picks, 900銘柄詳細）
+- Tailwind CSSはインライン`<style>`と外部CSSファイルの両方で出力
+- 各ページに動的メタタグ（銘柄名、PER、スコア等）を埋め込み
+
+**ビルドプロセス:**
+```bash
+npm run build:prerender
+# 1. scripts/fetch-picks.mjs でAPIから銘柄データ取得
+# 2. tsc でTypeScriptチェック
+# 3. vite-react-ssg build で905ページを生成
+```
+
+**成果:**
+| 項目 | SPA（旧）| SSG（新）|
+|------|---------|---------|
+| トップページサイズ | 2.9KB | 43KB |
+| プリレンダリングページ | 1 | 905 |
+| sitemap.xml URL数 | ~4 | 905 |
+| SEO | クライアント側のみ | 完全サーバーサイドHTML |
+| 銘柄詳細ページ | JS生成 | 静的HTML（動的タイトル） |
+
+**注意点:**
+- `index.html`に`<script type="module" src="/src/main.tsx">`必須（vite-react-ssgがエントリー検出に使用）
+- ないとCSS/JSが出力されない（manifestが空になる）
+
 ### 表示項目
 - **KPI バー**: 総数 / 適合数 / 監視数 / オーナー企業数 / 平均 PER
 - **スクリーニング条件**: 定量スコア基準・適合基準・監視基準を明示
@@ -193,7 +225,7 @@ React 19 + Vite + Tailwind v4 + Recharts + react-helmet-async + react-router-dom
 - **ソート機能**: カラムヘッダクリックで昇降順ソート（デフォルト NC 比率降順）
 - **個別銘柄ページ**: 全指標 + AI 評価理由 + パフォーマンスチャート
 - **パフォーマンスチャート**: 株価（円）+ リターン率 + 日経平均 + Alpha（ComposedChart / 二重 Y 軸）
-- **SEO**: meta description / OGP / JSON-LD / dynamic sitemap / SSR pick pages
+- **SEO**: meta description / OGP / JSON-LD / 905 URL sitemap / SSG 全ページプリレンダリング
 
 ### ページ
 - `/` — ランディングページ
@@ -256,18 +288,22 @@ kiyohara-method-screener/
 │   ├── tracking.ts         # Alpha トラッキング
 │   ├── yfinance_data.py    # yfinance 統合スクリプト（株価+TOPIX+BS）
 │   └── debug-*.ts          # デバッグ用スクリプト群
-├── frontend/               # React フロントエンド
-│   └── src/
-│       ├── App.tsx          # ルーティング（BrowserRouter）
-│       ├── Landing.tsx      # ランディングページ
-│       ├── Dashboard.tsx    # ダッシュボード
-│       ├── StockDetail.tsx  # 個別銘柄詳細
-│       ├── Method.tsx       # 清原メソッド解説
-│       ├── FAQ.tsx          # FAQ
-│       ├── About.tsx        # 運営者情報
-│       └── components/
-│           ├── PickList.tsx  # ソート可能銘柄一覧テーブル
-│           └── PerformanceChart.tsx
+├── frontend/               # React フロントエンド（SSG）
+│   ├── index.html          # エントリーHTML（`<script type="module">`必須）
+│   ├── vite.config.ts      # Vite + SSG設定
+│   ├── src/
+│   │   ├── main.tsx        # SSGエントリー（ViteReactSSG）
+│   │   ├── App.tsx         # ルーティング（StaticRouter for SSG）
+│   │   ├── Landing.tsx     # ランディングページ
+│   │   ├── Dashboard.tsx   # ダッシュボード
+│   │   ├── StockDetail.tsx # 個別銘柄詳細
+│   │   ├── Method.tsx      # 清原メソッド解説
+│   │   ├── FAQ.tsx         # FAQ
+│   │   ├── About.tsx       # 運営者情報
+│   │   └── components/
+│   │       ├── PickList.tsx  # ソート可能銘柄一覧テーブル
+│   │       └── PerformanceChart.tsx
+│   └── dist/               # ビルド出力（905ページ + assets）
 ├── migrations/             # D1 マイグレーション
 │   ├── 0001_initial_schema.sql
 │   ├── 0002_edinet_mappings.sql
