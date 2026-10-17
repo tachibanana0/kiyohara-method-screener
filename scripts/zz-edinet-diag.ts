@@ -1,16 +1,22 @@
-// Diagnose: strict secCode match for チェンジホールディングス (3962) on recent dates
+// Diagnose EDINET WAF behavior from GH runners with redirect following + UA
 const key = process.env.EDINET_SUBSCRIPTION_KEY;
 if (!key) { console.log('no key'); process.exit(0); }
-const secCode = '3962';
-let found = 0;
-for (let d = 0; d < 30; d++) {
-  const date = new Date(); date.setDate(date.getDate() - d);
-  const ds = date.toISOString().slice(0, 10);
-  const url = `https://disclosure.edinet-fsa.go.jp/api/v2/documents.json?date=${ds}&type=2`;
-  const res = await fetch(url, { headers: { 'Ocp-Apim-Subscription-Key': key } });
-  if (!res.ok) { continue; }
-  const data = await res.json() as { results?: Array<{ secCode?: string; edinetCode: string; filerName: string; docDescription: string }> };
-  const hits = (data.results || []).filter(r => r.secCode === secCode);
-  for (const h of hits) { console.log(ds, h.docDescription, h.filerName); found++; }
+const date = new Date(); date.setDate(date.getDate() - 30);
+const ds = date.toISOString().slice(0, 10);
+for (const host of ['disclosure.edinet-fsa.go.jp', 'disclosure2.edinet-fsa.go.jp']) {
+  const url = `https://${host}/api/v2/documents.json?date=${ds}&type=2`;
+  for (const ua of ['default', 'browser']) {
+    try {
+      const res = await fetch(url, {
+        redirect: 'follow',
+        headers: ua === 'browser'
+          ? { 'Ocp-Apim-Subscription-Key': key, 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36', Accept: 'application/json' }
+          : { 'Ocp-Apim-Subscription-Key': key },
+      });
+      const text = await res.text();
+      console.log(`${host} ua=${ua}: ${res.status} ${res.url.slice(0, 70)} ${text.slice(0, 60).replace(/\n/g, ' ')}`);
+    } catch (e) {
+      console.log(`${host} ua=${ua}: ERR ${(e as Error).message}`);
+    }
+  }
 }
-console.log('total secCode hits:', found);
