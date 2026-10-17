@@ -298,7 +298,7 @@ export class AlphaTrackingWorkflow extends WorkflowEntrypoint<Env, AlphaTracking
 
     // 最新TOPIX
     const topixPrice = await step.do('fetch-topix', { retries: { limit: 3, delay: '10 seconds' } }, async () => {
-      return await yahoo.fetchTopix();
+      return await yahoo.fetchNikkei225();
     });
 
     if (!topixPrice) {

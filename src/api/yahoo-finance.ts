@@ -117,9 +117,10 @@ export class YahooFinanceClient {
 
   /** 日経平均指数を取得（^N225）
    *  NOTE: Yahoo Financeの ^TOPX (TOPIX) は404のため、
-   *  ベンチマークとして日経平均を使用
+   *  ベンチマークとして日経平均を使用。DB列名は topix のまま（互換維持）だが
+   *  実体は日経225。
    */
-  async fetchTopix(): Promise<number | null> {
+  async fetchNikkei225(): Promise<number | null> {
     const url = `${this.baseUrl}/^N225?interval=1d&range=1d`;
 
     const controller = new AbortController();

@@ -9,7 +9,7 @@ on:
 jobs:
   tracking:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -18,6 +18,8 @@ jobs:
           node-version: '20'
 
       - run: npm install
+      - name: Install yfinance
+        run: pip install yfinance
 
       - name: Run Alpha Tracking
         env:

@@ -258,23 +258,6 @@ function formatDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-function normalizeCompanyName(name: string): string {
-  return name
-    .replace(/株式会社/g, '')
-    .replace(/（株）/g, '')
-    .replace(/\(株\)/g, '')
-    .replace(/ホールディングス/g, '')
-    .replace(/ＨＤ/g, '')
-    .replace(/HD/g, '')
-    .replace(/グループ/g, '')
-    .replace(/ジャパン/g, '')
-    .replace(/Japan/gi, '')
-    .replace(/インターナショナル/g, '')
-    .replace(/International/gi, '')
-    .replace(/[\s　・]/g, '')
-    .trim();
-}
-
 class EdinetClient {
   private baseUrl: string;
   private subscriptionKey: string;
@@ -286,25 +269,17 @@ class EdinetClient {
 
   async fetchLatestYukashokenReports(
     secCode: string,
-    companyName?: string,
-    edinetCode?: string,
-    _fiscalYearEnd?: string
-  ): Promise<Array<{ docID: string; submitDateTime: string; filerName: string; edinetCode: string }>> {
+    edinetCode?: string
+  ): Promise<Array<{ docID: string; submitDateTime: string; filerName: string; edinetCode: string; docDescription?: string }>> {
     const today = new Date();
     const headers = {
       'Content-Type': 'application/json',
       'Ocp-Apim-Subscription-Key': this.subscriptionKey,
     };
     const secCode4 = secCode.replace(/0$/, ''); // 5桁→4桁
-    const normalizedName = companyName ? normalizeCompanyName(companyName) : '';
-    // 会社名の先頭2〜3文字も取得（部分一致のフォールバック）
-    const namePrefix2 = normalizedName.slice(0, 2);
-    const namePrefix3 = normalizedName.slice(0, 3);
 
-    // 粗密探索: 直近は密に、過去は疎に
-    // Phase 1: every day for first 60 days (close matches)
-    // Phase 2: every 7 days for next 180 days (extended search)
-    // Phase 3: every 14 days beyond (rare cases)
+    // 選定日近傍のみを日次で探索し、それ以前は週次に落として軽量化。
+    // 識別子(edinetCode/secCode)での厳密一致のみにしたため誤マッチは起きない。
     const searchSteps: number[] = [];
     for (let d = 0; d < 60; d++) searchSteps.push(d);
     for (let d = 60; d < 240; d += 7) searchSteps.push(d);
@@ -331,22 +306,10 @@ class EdinetClient {
             || d.includes('半期報告書') || d.includes('四半期報告書')
             || d.includes('決算短信') || d.includes('臨時報告書');
           if (!isFinancial) return false;
-          // Match by edinetCode (exact)
+          // 識別子による厳密一致のみ。会社名の部分一致は誤マッチ（別会社の有報を引く）を
+          // 大量に生むため廃止（例: 「日本オラクル」の有報が「日本郵船」等に紐付く事故）
           if (edinetCode && r.edinetCode === edinetCode) return true;
-          // Match by secCode
           if (r.secCode && (r.secCode === secCode || r.secCode === secCode4)) return true;
-          // Match by filerName
-          if (r.filerName) {
-            const filerNorm = normalizeCompanyName(r.filerName);
-            // 完全一致
-            if (normalizedName && filerNorm === normalizedName) return true;
-            // 相互包含
-            if (normalizedName && (filerNorm.includes(normalizedName) || normalizedName.includes(filerNorm))) return true;
-            // 先頭2〜3文字一致（短い会社名対策）
-            if (namePrefix2.length >= 2 && filerNorm.startsWith(namePrefix2)) return true;
-            // EDINET filerNameが元の会社名を含むか
-            if (companyName && r.filerName.includes(companyName)) return true;
-          }
           return false;
         });
 
@@ -456,13 +419,10 @@ class OpenRouterClient {
 Evaluate the company and respond with ONLY a JSON object. Do not include any explanation or text outside the JSON.
 
 Criteria:
-1. is_owner_company: 1 if the founder or founding family still holds significant management control (CEO, Chairman, or Representative Director) AND/OR holds a large ownership stake (appears as a major shareholder with significant percentage). Look for indicators like:
-   - Founder listed as 代表取締役社長、会長、執行役員
-   - Founder/family as top shareholders (>10% stake)
-   - Company history (沿革) section referencing founder's ongoing involvement
-   - CEO personally holds a large number of shares
-   - Family members in key management positions
-   Set to 0 if the company appears to be a subsidiary, professionally managed, or if founder/family has no significant remaining stake.
+1. is_owner_company: 1 ONLY if you can cite concrete names and numbers found in the text:
+   - A founder or founding family member holds ≥10% of shares AND still serves as 代表取締役/会長/社長, OR
+   - Major shareholders section shows the founder/family/their asset-management company as a top shareholder or 発行者の創業者...と明記, with the name verifiable in 役員の状況 or 沿革.
+   Mere surname coincidence, "可能性が高い", or missing shareholder data is NOT sufficient: set 0 and explain what is missing. Set 0 for subsidiaries and investment funds.
 
 2. management_score: 1-100, where:
    - 80-100: Excellent management with clear strategy, strong governance, long track record
@@ -471,7 +431,7 @@ Criteria:
    - 20-40: Below average, some governance concerns
    - 1-20: Poor management, red flags
 
-3. reason: Brief reason in Japanese (2-3 sentences). For is_owner_company, cite specific evidence (e.g., founder name, shareholding percentage, family involvement). For management_score, cite specific strengths or weaknesses found in the report.
+3. reason: Brief reason in Japanese (2-3 sentences). For is_owner_company, quote the exact evidence (name + stake %). If evidence is insufficient, state precisely what is missing. Do not fabricate names or percentages not present in the text.
 
 Respond with ONLY this JSON format:
 {"is_owner_company": 0, "management_score": 50, "reason": "理由"}
@@ -479,42 +439,64 @@ Respond with ONLY this JSON format:
 Document text:
 ${relevantText}`;
 
-    const res = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-        'HTTP-Referer': 'https://kiyohara-screener.hikakunavi360.com',
-        'X-Title': 'Kiyohara Method Screener',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.1,
-      }),
-    });
+    const evalOnce = async (): Promise<string> => {
+      const res = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+          'HTTP-Referer': 'https://kiyohara-screener.hikakunavi360.com',
+          'X-Title': 'Kiyohara Method Screener',
+        },
+        body: JSON.stringify({
+          model: process.env.LLM_MODEL || 'google/gemini-2.5-flash',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+        }),
+      });
 
-    if (!res.ok) {
-      throw new Error(`OpenRouter API error: ${res.status}`);
-    }
-
-    const data = await res.json() as { choices: Array<{ message: { content: string } }> };
-    const content = data.choices[0]?.message?.content || '';
-    
-    try {
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]) as LlmEvaluation;
+      if (!res.ok) {
+        throw new Error(`OpenRouter API error: ${res.status}`);
       }
-    } catch (err) {
-      console.warn('Failed to parse LLM response:', err);
-      console.warn('Raw content:', content.slice(0, 200));
+
+      const data = await res.json() as { choices: Array<{ message: { content: string } }> };
+      return data.choices[0]?.message?.content || '';
+    };
+
+    // JSONパースに失敗したら1回だけリトライ（低性能モデルの包み込み揺れ対策）
+    let lastContent = '';
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const content = await evalOnce();
+      lastContent = content;
+      try {
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed: unknown = JSON.parse(jsonMatch[0]);
+          if (
+            parsed !== null && typeof parsed === 'object' &&
+            typeof (parsed as Record<string, unknown>).is_owner_company === 'number' &&
+            typeof (parsed as Record<string, unknown>).management_score === 'number' &&
+            typeof (parsed as Record<string, unknown>).reason === 'string'
+          ) {
+            const ev = parsed as Record<string, unknown>;
+            return {
+              is_owner_company: ev.is_owner_company as number,
+              management_score: ev.management_score as number,
+              reason: ev.reason as string,
+            };
+          }
+        }
+      } catch {
+        // fallthrough to retry
+      }
+      console.warn(`LLM JSON parse failed (attempt ${attempt + 1}):`, content.slice(0, 120));
     }
 
     return {
       is_owner_company: 0,
       management_score: 0,
-      reason: 'Failed to parse LLM response',
+      reason: `LLM応答の解析に失敗しました: ${lastContent.slice(0, 80)}`,
     };
   }
 }
@@ -546,10 +528,19 @@ async function runScreening(): Promise<PickResult[]> {
   // 除外業種（S33コード）：銀行・証券・保険・電力など財務構造が特殊な業種
   const EXCLUDED_S33 = new Set(['7050', '7100', '7200', '4050', '6050', '1050']);
 
+  // 投資法人・REIT・ETF 等は清原メソッドの対象外（オーナー企業概念が存在しない）
+  const EXCLUDED_NAME_PATTERNS = [
+    /投資法人/, /投資信託/, /リート/, /ＲＥＩＴ/, /REIT/i,
+    /ファンド/, /ＥＴＦ/, /ETF/i, /ＥＴＮ/, /ETN/i,
+    /インベストメント[・・]?株式会社/,
+  ];
+
   const targetSymbols = symbols.filter((s) => {
     if (!TARGET_MARKETS.includes(s.Mkt || '')) return false;
     // 業種フィルタ：金融・電力等を除外
     if (s.S33 && EXCLUDED_S33.has(s.S33)) return false;
+    // 投資法人等の除外
+    if (EXCLUDED_NAME_PATTERNS.some((re) => re.test(s.CoName))) return false;
     const codeWithoutTrailingZero = (s.Code || '').replace(/0$/, '');
     return /^\d{4}$/.test(codeWithoutTrailingZero);
   });
@@ -726,7 +717,7 @@ function computeQuantScore(marketCap: number, realPER: number, ncRatio: number, 
   for (const stock of llmStocks) {
     try {
       const edinetCode = edinetCodeMap.get(stock.code);
-      const reports = await edinet.fetchLatestYukashokenReports(stock.code, stock.name, edinetCode, stock.fiscalYearEnd);
+      const reports = await edinet.fetchLatestYukashokenReports(stock.code, edinetCode);
       if (reports.length === 0) {
         console.log(`Skip ${stock.code}: no EDINET reports (saving quantitative data only)`);
         // Save without LLM evaluation — quantitative data still valuable
@@ -738,7 +729,7 @@ function computeQuantScore(marketCap: number, realPER: number, ncRatio: number, 
       }
 
       // Skip correction reports (訂正報告書) — don't contain management info
-      const primaryReport = reports.find((r: EdinetDocument) => !r.docDescription?.includes('訂正')) || reports[0];
+      const primaryReport = reports.find((r) => !r.docDescription?.includes('訂正')) || reports[0];
 
       const docText = await edinet.fetchDocumentText(primaryReport.docID);
       const evalResult = await openrouter.evaluateCompany(docText);
@@ -754,40 +745,47 @@ function computeQuantScore(marketCap: number, realPER: number, ncRatio: number, 
   console.log(`Step 5 complete: ${evaluated.length} stocks evaluated`);
 
   console.log('Step 6: Pick選定 (2-Tier)');
+
+  // 本のハード基準（スコアはソート用。選定は基準適合を必須にする）
+  // - 時価総額 ≤ MAX_MARKET_CAP（本: 270億）
+  // - 0 < 実質PER ≤ MAX_PER（実質PER≤0 はネットキャッシュが時価総額を超えた赤字相当でゼロ除算事故を含む）
+  // - ネットキャッシュ > 0
+  const MAX_MARKET_CAP = parseInt(process.env.MAX_MARKET_CAP || '270', 10);
+  const MAX_PER = parseInt(process.env.MAX_PER || '25', 10);
+  const meetsHardCriteria = (s: QuantScreenedStock): boolean =>
+    s.marketCap <= MAX_MARKET_CAP && s.realPER > 0 && s.realPER <= MAX_PER && s.netCash > 0;
+
   const picks: PickResult[] = [];
   const pickedCodes = new Set<string>();
 
-  // Tier 1: 清原メソッド完全適合（定量スコア通過済 + LLM評価）
+  // Tier 1: 清原メソッド完全適合（ハード基準 + オーナー企業 + LLMスコア）
   for (const item of evaluated) {
-    const combinedScore = item.eval.management_score; // LLMの定性評価
-    if (
-      item.eval.is_owner_company &&
-      combinedScore >= MIN_SCORE
-    ) {
-      picks.push({
-        code: item.stock.code,
-        name: item.stock.name,
-        marketCap: item.stock.marketCap,
-        netCash: item.stock.netCash,
-        netCashRatio: item.stock.netCashRatio,
-        realPER: item.stock.realPER,
-        salesGrowth3Y: item.stock.salesGrowth3Y,
-        profitGrowth3Y: item.stock.profitGrowth3Y,
-        isOwnerCompany: item.eval.is_owner_company,
-        managementScore: item.eval.management_score,
-        latestPrice: item.stock.latestPrice,
-        latestTopix: item.stock.latestTopix,
-        isKiyoharaCompliant: true,
-        reason: item.eval.reason,
-      });
-      pickedCodes.add(item.stock.code);
-      console.log(`PICK (清原適合): ${item.stock.code} ${item.stock.name}`);
-    }
+    if (!meetsHardCriteria(item.stock)) continue;
+    if (!item.eval.is_owner_company || item.eval.management_score < MIN_SCORE) continue;
+    picks.push({
+      code: item.stock.code,
+      name: item.stock.name,
+      marketCap: item.stock.marketCap,
+      netCash: item.stock.netCash,
+      netCashRatio: item.stock.netCashRatio,
+      realPER: item.stock.realPER,
+      salesGrowth3Y: item.stock.salesGrowth3Y,
+      profitGrowth3Y: item.stock.profitGrowth3Y,
+      isOwnerCompany: item.eval.is_owner_company,
+      managementScore: item.eval.management_score,
+      latestPrice: item.stock.latestPrice,
+      latestTopix: item.stock.latestTopix,
+      isKiyoharaCompliant: true,
+      reason: item.eval.reason,
+    });
+    pickedCodes.add(item.stock.code);
+    console.log(`PICK (清原適合): ${item.stock.code} ${item.stock.name}`);
   }
 
-  // Tier 2: 監視対象 (Watchlist)
+  // Tier 2: 監視対象 (Watchlist) — ハード基準は Tier1 同様に必須。大型株スコア拾いを防止
   for (const item of evaluated) {
     if (pickedCodes.has(item.stock.code)) continue;
+    if (!meetsHardCriteria(item.stock)) continue;
     if (item.eval.management_score >= WATCH_SCORE) {
       picks.push({
         code: item.stock.code,

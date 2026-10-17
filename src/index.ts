@@ -263,14 +263,24 @@ app.post('/api/tracking/receive', async (c) => {
   const targetDate = body.date ?? new Date().toISOString().slice(0, 10);
   const db = new ScreenerDB(c.env.DB);
 
-  const trackingRows: Parameters<typeof db.batchInsertTracking>[0] = body.rows.map((row: any) => ({
-    code: row.code,
-    date: targetDate,
-    price: row.price,
-    topix: row.topix,
-    alpha: row.alpha,
-    cumulative_alpha: row.cumulative_alpha,
-  }));
+  // cumulative_alpha は既存系列の最終値に当日 alpha を加算して計算する。
+  // スクリプト側の単日値 (== alpha) をそのまま保存すると、フェンスポストで
+  // チャートの累積Alphaが毎日リセットされてしまう。
+  const trackingRows: Parameters<typeof db.batchInsertTracking>[0] = [];
+  for (const row of body.rows) {
+    if (typeof row?.code !== 'string' || typeof row?.price !== 'number') continue;
+    const series = await db.getTrackingSeries(row.code);
+    const prevCumulative = series.length > 0 ? series[series.length - 1].cumulative_alpha : 0;
+    const alpha = typeof row.alpha === 'number' ? row.alpha : 0;
+    trackingRows.push({
+      code: row.code,
+      date: targetDate,
+      price: row.price,
+      topix: typeof row.topix === 'number' ? row.topix : 0,
+      alpha,
+      cumulative_alpha: prevCumulative + alpha,
+    });
+  }
 
   await db.batchInsertTracking(trackingRows);
 

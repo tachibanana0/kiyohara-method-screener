@@ -114,7 +114,7 @@ export class JQuantsClient {
     console.log(`Fetched Yahoo prices for ${priceMap.size} stocks`);
 
     // --- 3. Yahoo FinanceでTOPIX取得 ---
-    const topix = await yahoo.fetchTopix();
+    const topix = await yahoo.fetchNikkei225();
     console.log(`TOPIX: ${topix}`);
 
     // --- 4. J-Quantsで財務データ取得（レートリミット厳守） ---

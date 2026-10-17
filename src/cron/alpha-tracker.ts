@@ -18,7 +18,7 @@ export async function runAlphaTracking(env: TrackerEnv, date?: string): Promise<
   const activePicks = await db.getActivePicks();
   if (activePicks.length === 0) return { tracked: 0 };
 
-  const topixPrice = await yahoo.fetchTopix();
+  const topixPrice = await yahoo.fetchNikkei225();
   if (!topixPrice) throw new Error('TOPIX fetch failed');
 
   const trackingRows: Parameters<typeof db.batchInsertTracking>[0] = [];

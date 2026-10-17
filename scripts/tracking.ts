@@ -7,6 +7,8 @@
  * - SCREENING_API_TOKEN: Worker認証用トークン
  */
 
+import { execSync } from 'node:child_process';
+
 interface Pick {
   code: string;
   name: string;
@@ -22,59 +24,53 @@ interface TrackingRow {
   cumulative_alpha: number;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+interface YfStock {
+  code: string;
+  price: number;
+  error?: string;
 }
 
-interface YahooChartResponse {
-  chart: {
-    result: Array<{
-      indicators: { quote: Array<{ close: number[] }> };
-    }>;
-  };
+interface YfResult {
+  topix: number;
+  stocks: YfStock[];
 }
 
-class YahooFinanceClient {
-  private async fetchJson<T>(url: string): Promise<T> {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        Accept: 'application/json',
-      },
-    });
-    if (!res.ok) {
-      throw new Error(`Yahoo Finance API error: ${res.status}`);
-    }
-    return res.json() as Promise<T>;
-  }
+// yfinance (子プロセス) で株価・日経平均を一括取得。
+// GitHub Actions の共有 IP から query1.finance.yahoo.com を直叩きすると
+// ブロックされるため、README の決定通り yfinance 経由のみを使う。
+function fetchYfinanceTracking(codes: string[]): YfResult {
+  const empty: YfResult = { topix: 0, stocks: [] };
+  if (codes.length === 0) return empty;
+  try {
+    // 1400銘柄で引数長制限に触れないよう 500 件ずつ分割して実行。
+    const chunks: string[][] = [];
+    for (let i = 0; i < codes.length; i += 500) chunks.push(codes.slice(i, i + 500));
 
-  async fetchQuote(code: string): Promise<number | null> {
-    const trimmed = code.replace(/0$/, '');
-    const ticker = `${trimmed}.T`;
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`;
-    
-    try {
-      const data = await this.fetchJson<YahooChartResponse>(url);
-      const result = data.chart?.result?.[0];
-      const quote = result?.indicators?.quote?.[0];
-      return quote?.close?.[0] ?? null;
-    } catch (err) {
-      console.warn(`Yahoo quote failed for ${code}:`, err);
-      return null;
+    let topix = 0;
+    const byCode = new Map<string, number>();
+    for (const chunk of chunks) {
+      const result = execSync(`python3 scripts/yfinance_data.py ${chunk.join(' ')}`, {
+        encoding: 'utf-8',
+        timeout: 300000,
+        maxBuffer: 50 * 1024 * 1024,
+      });
+      const data: unknown = JSON.parse(result);
+      if (data === null || typeof data !== 'object' || !('stocks' in data)) continue;
+      const parsed = data as YfResult;
+      if ('error' in parsed) {
+        console.warn('yfinance error:', parsed.error);
+        continue;
+      }
+      topix = parsed.topix || topix;
+      for (const s of parsed.stocks || []) {
+        if (typeof s.price === 'number' && s.price > 0) byCode.set(s.code, s.price);
+      }
     }
-  }
-
-  async fetchTopix(): Promise<number | null> {
-    const url = 'https://query1.finance.yahoo.com/v8/finance/chart/^N225?interval=1d&range=1d';
-    try {
-      const data = await this.fetchJson<YahooChartResponse>(url);
-      const result = data.chart?.result?.[0];
-      const quote = result?.indicators?.quote?.[0];
-      return quote?.close?.[0] ?? null;
-    } catch (err) {
-      console.warn('Yahoo TOPIX fetch failed:', err);
-      return null;
-    }
+    console.log(`yfinance: ${byCode.size}/${codes.length} prices, benchmark=${topix}`);
+    return { topix, stocks: [...byCode].map(([code, price]) => ({ code, price })) };
+  } catch (err: unknown) {
+    console.warn('yfinance failed:', err instanceof Error ? err.message : err);
+    return empty;
   }
 }
 
@@ -88,8 +84,6 @@ async function main() {
   if (!screeningApiUrl || !screeningApiToken) {
     throw new Error('Missing SCREENING_API_URL or SCREENING_API_TOKEN');
   }
-
-  const yahoo = new YahooFinanceClient();
 
   console.log('Step 1: Fetch active picks from Worker...');
   const picksRes = await fetch(`${screeningApiUrl}/api/picks`, {
@@ -108,46 +102,42 @@ async function main() {
     return;
   }
 
-  console.log('Step 2: Fetch TOPIX...');
-  const topix = await yahoo.fetchTopix();
+  console.log('Step 2: Fetch prices via yfinance (batch)...');
+  const { topix, stocks } = fetchYfinanceTracking(picks.map((p) => p.code));
   if (!topix) {
-    throw new Error('Failed to fetch TOPIX');
+    throw new Error('Failed to fetch benchmark (^N225) via yfinance');
   }
-  console.log(`TOPIX: ${topix}`);
+  console.log(`Benchmark: ${topix}`);
+  const priceByCode = new Map(stocks.map((s) => [s.code, s.price]));
 
-  console.log('Step 3: Fetch stock prices...');
+  console.log('Step 3: Compute alpha...');
   const trackingRows: TrackingRow[] = [];
 
   for (const pick of picks) {
-    try {
-      await sleep(500);
-      const price = await yahoo.fetchQuote(pick.code);
-      if (!price) {
-        console.warn(`Failed to fetch price for ${pick.code}`);
-        continue;
-      }
-
-      if (!pick.initial_price || !pick.initial_topix) {
-        console.warn(`Missing initial data for ${pick.code}`);
-        continue;
-      }
-
-      const stockReturn = (price - pick.initial_price) / pick.initial_price;
-      const topixReturn = (topix - pick.initial_topix) / pick.initial_topix;
-      const alpha = (stockReturn - topixReturn) * 100;
-
-      trackingRows.push({
-        code: pick.code,
-        price,
-        topix,
-        alpha,
-        cumulative_alpha: alpha,
-      });
-
-      console.log(`${pick.code}: price=${price}, alpha=${alpha.toFixed(2)}%`);
-    } catch (err) {
-      console.warn(`Tracking failed for ${pick.code}:`, err);
+    const price = priceByCode.get(pick.code);
+    if (!price) {
+      console.warn(`Failed to fetch price for ${pick.code}`);
+      continue;
     }
+
+    if (!pick.initial_price || !pick.initial_topix) {
+      console.warn(`Missing initial data for ${pick.code}`);
+      continue;
+    }
+
+    const stockReturn = (price - pick.initial_price) / pick.initial_price;
+    const topixReturn = (topix - pick.initial_topix) / pick.initial_topix;
+    const alpha = (stockReturn - topixReturn) * 100;
+
+    trackingRows.push({
+      code: pick.code,
+      price,
+      topix,
+      alpha,
+      cumulative_alpha: alpha,
+    });
+
+    console.log(`${pick.code}: price=${price}, alpha=${alpha.toFixed(2)}%`);
   }
 
   console.log(`Step 3 complete: ${trackingRows.length} rows to save`);
