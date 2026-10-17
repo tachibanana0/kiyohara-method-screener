@@ -1,17 +1,14 @@
-// Diagnose EDINET WAF: does a "warm-up" visit to the WAF page grant access to /api/v2?
+// Check whether the WAF error page is triggered by the URL pattern (/api/v2) itself.
+// Test other EDINET endpoints that used to work and the error page's exact response to /api/ versions.
 const key = process.env.EDINET_SUBSCRIPTION_KEY;
-if (!key) { console.log('no key'); process.exit(0); }
-const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
-const date = new Date(); date.setDate(date.getDate() - 30);
-const ds = date.toISOString().slice(0, 10);
-
-// Attempt 1: hit the error page first to acquire cookies, then call API with cookie jar (undici fetch doesn't share cookies; manual)
-const gateRes = await fetch('https://disclosure2.edinet-fsa.go.jp/WZEK0130.aspx', { headers: { 'User-Agent': UA } });
-const setCookies = [...gateRes.headers.getSetCookie?.() ?? []].map((c: string) => c.split(';')[0]);
-console.log('gate:', gateRes.status, 'cookies:', setCookies.length);
-const res = await fetch(`https://disclosure2.edinet-fsa.go.jp/api/v2/documents.json?date=${ds}&type=2`, {
-  headers: { 'Ocp-Apim-Subscription-Key': key, 'User-Agent': UA, Accept: 'application/json', Cookie: setCookies.join('; ') },
-  redirect: 'follow',
-});
-const text = await res.text();
-console.log('api after warmup:', res.status, text.slice(0, 80).replace(/\n/g, ' '));
+const UA = 'Mozilla/5.0';
+const ds = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+const tests = [
+  `/api/v2/documents.json?date=${ds}&type=2`,
+  `/api/v1/documents.json?date=${ds}&type=2`,
+];
+for (const p of tests) {
+  const res = await fetch(`https://disclosure2.edinet-fsa.go.jp${p}`, { headers: { 'Ocp-Apim-Subscription-Key': key, 'User-Agent': UA }, redirect: 'follow' });
+  const t = await res.text();
+  console.log(p.slice(0, 12), '→', res.status, res.url.includes('wzek0130') ? 'WAF-block' : 'JSON?', t.slice(0, 60).replace(/\n/g, ' '));
+}
