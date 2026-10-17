@@ -18,7 +18,7 @@
   "vars": {
     "APP_URL": "https://kiyohara-screener.hikakunavi360.com",
     "JQUANTS_API_BASE": "https://api.jquants.com/v2",
-    "EDINET_API_BASE": "https://disclosure.edinet-fsa.go.jp/api/v2",
+    "EDINET_API_BASE": "https://api.edinet-fsa.go.jp/api/v2",
     "OPENROUTER_API_BASE": "https://openrouter.ai/api/v1"
   }
 }

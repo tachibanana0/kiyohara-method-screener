@@ -14,7 +14,7 @@ if (!subscriptionKey) {
 }
 
 async function searchEdinet() {
-  const baseUrl = 'https://disclosure.edinet-fsa.go.jp/api/v2';
+  const baseUrl = 'https://api.edinet-fsa.go.jp/api/v2';
   const today = new Date();
   
   console.log(`Searching for: secCode=${secCode}, companyName=${companyName}`);

@@ -29,7 +29,7 @@ async function testCorrectEdinetCode() {
       date.setDate(date.getDate() - daysBack);
       const dateStr = date.toISOString().slice(0, 10);
       
-      const url = `https://disclosure.edinet-fsa.go.jp/api/v2/documents.json?date=${dateStr}&type=2`;
+      const url = `https://api.edinet-fsa.go.jp/api/v2/documents.json?date=${dateStr}&type=2`;
       const res = await fetch(url, {
         headers: { 'Ocp-Apim-Subscription-Key': subscriptionKey },
       });

@@ -15,7 +15,7 @@ if (!subscriptionKey) {
 }
 
 async function testEdinet() {
-  const baseUrl = 'https://disclosure.edinet-fsa.go.jp/api/v2';
+  const baseUrl = 'https://api.edinet-fsa.go.jp/api/v2';
   
   // Test: Document retrieval with ZIP extraction
   console.log('=== Test: Document Retrieval with ZIP Extraction ===');

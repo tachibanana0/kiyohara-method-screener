@@ -273,8 +273,8 @@ SVG 要素の `fill`/`stroke` 属性に React 19 警告。Recharts v2 側の対�
 ### 9. EDINET 会社名部分一致の事故と廃止
 「日本オラクル」の有報が「日本郵船」「日本車輌製造」等 12 社に、「プロロジスREIT」の有報が「日本精工」に紐付く事故が起きた（picks の 19% が誤マッチ文書由来の reason）。原因は normalize 後の会社名先頭 2〜3 文字での `startsWith` フォールバック。「日本」「アイ」「オー」等の共通 prefix が別会社に延々一致していた。会社名マッチングを全面廃止し、`edinetCode`/`secCode` 厳密一致のみにした。
 
-### 10. EDINET WAF ブロック
-2026 年 8 月後半頃から、GitHub ランナー・Cloudflare Worker どちらの Egress からも EDINET API v2 が HTML エラー画面（`wzek0130.aspx`）を返すようになった（エラー画面は 200 ステータスなので JSON パースで落ちる）。`content-type` チェックで検知し、JSON パース前に打ち切るガードを追加。ブロック期間中は定量スコアのみで運用される。
+### 10. EDINET API ホスト移行 (2026年8月末)
+EDINET は 2026 年 8 月末に API を `disclosure.edinet-fsa.go.jp` → `api.edinet-fsa.go.jp` に移行した。旧ホストは `disclosure2` へリダイレクトされ、WAF（`wzek0130.aspx` エラー画面、200 ステータスで HTML を返す）が全クライアントをチャレンジする。8/18〜9/1 の間に定性評価が全滅した原因はこれ。旧ホストを呼んでいたコードを新ホストへ全面切替し、加えて `content-type` チェック（HTML 応答を JSON パースせず打ち切り）のガードも入れた。
 
 ## GitHub Actions ワークフロー
 

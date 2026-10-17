@@ -9,13 +9,13 @@ if (!subscriptionKey) {
   process.exit(1);
 }
 
-const BASE = 'https://disclosure.edinet-fsa.go.jp/api/v2';
+const BASE = 'https://api.edinet-fsa.go.jp/api/v2';
 
 async function main() {
   // Test 1: v1 corporates.json
   console.log('=== Test 1: v1 corporates.json ===');
   try {
-    const res1 = await fetch('https://disclosure.edinet-fsa.go.jp/api/v1/corporates.json', {
+    const res1 = await fetch('https://api.edinet-fsa.go.jp/api/v1/corporates.json', {
       headers: { 'Ocp-Apim-Subscription-Key': subscriptionKey },
     });
     console.log(`Status: ${res1.status}`);

@@ -18,7 +18,7 @@ if (!subscriptionKey || !openrouterKey) {
 }
 
 async function main() {
-  const baseUrl = 'https://disclosure.edinet-fsa.go.jp/api/v2';
+  const baseUrl = 'https://api.edinet-fsa.go.jp/api/v2';
   
   // Step 1: EDINET document fetch
   console.log('=== Step 1: Fetch EDINET Document ===');

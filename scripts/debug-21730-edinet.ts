@@ -8,7 +8,7 @@ if (!subscriptionKey) {
   process.exit(1);
 }
 
-const baseUrl = 'https://disclosure.edinet-fsa.go.jp/api/v2';
+const baseUrl = 'https://api.edinet-fsa.go.jp/api/v2';
 const headers = { 'Content-Type': 'application/json', 'Ocp-Apim-Subscription-Key': subscriptionKey };
 
 function formatDate(d: Date) { return d.toISOString().slice(0, 10); }

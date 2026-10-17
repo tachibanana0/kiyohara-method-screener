@@ -12,7 +12,7 @@ async function investigateSecCode() {
 
   // 2026-04-30の有報をすべて取得
   const dateStr = '2026-04-30';
-  const url = `https://disclosure.edinet-fsa.go.jp/api/v2/documents.json?date=${dateStr}&type=2`;
+  const url = `https://api.edinet-fsa.go.jp/api/v2/documents.json?date=${dateStr}&type=2`;
   
   const res = await fetch(url, {
     headers: { 'Ocp-Apim-Subscription-Key': subscriptionKey },

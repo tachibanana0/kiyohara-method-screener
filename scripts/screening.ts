@@ -263,7 +263,7 @@ class EdinetClient {
   private subscriptionKey: string;
   private wafBlocked = false;
 
-  constructor(subscriptionKey: string, baseUrl: string = 'https://disclosure.edinet-fsa.go.jp/api/v2') {
+  constructor(subscriptionKey: string, baseUrl: string = 'https://api.edinet-fsa.go.jp/api/v2') {
     this.baseUrl = baseUrl;
     this.subscriptionKey = subscriptionKey;
   }
