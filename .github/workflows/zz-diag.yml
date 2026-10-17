@@ -1,0 +1,14 @@
+name: ZZ EDINET diag
+on:
+  workflow_dispatch:
+jobs:
+  d:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm install
+      - env:
+          EDINET_SUBSCRIPTION_KEY: ${{ secrets.EDINET_SUBSCRIPTION_KEY }}
+        run: npx tsx scripts/zz-edinet-diag.ts
