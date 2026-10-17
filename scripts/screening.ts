@@ -261,6 +261,7 @@ function formatDate(d: Date): string {
 class EdinetClient {
   private baseUrl: string;
   private subscriptionKey: string;
+  private wafBlocked = false;
 
   constructor(subscriptionKey: string, baseUrl: string = 'https://disclosure.edinet-fsa.go.jp/api/v2') {
     this.baseUrl = baseUrl;
@@ -294,6 +295,16 @@ class EdinetClient {
       try {
         const res = await fetch(url, { headers });
         if (!res.ok) continue;
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('json')) {
+          // WAFがHTMLエラー画面(エラー画面/wzek0130.aspx)を返す期間がある。
+          // データセンターIP宛のブロックは運用側で解消を待つしかない。
+          if (!this.wafBlocked) {
+            this.wafBlocked = true;
+            console.warn('EDINET: WAF error page detected (non-JSON response). Skipping remaining date scans.');
+          }
+          break;
+        }
 
         const data = await res.json() as { results?: Array<{ docID: string; submitDateTime: string; filerName: string; docDescription: string; edinetCode: string; secCode: string }> };
         const results = data.results || [];
@@ -335,6 +346,11 @@ class EdinetClient {
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       throw new Error(`EDINET document fetch failed: ${res.status} ${text.slice(0, 200)}`);
+    }
+    const docContentType = res.headers.get('content-type') || '';
+    if (!docContentType.includes('zip') && !docContentType.includes('octet')) {
+      // WAFのHTMLエラー画面が ZIP の代わりに返ってきた場合
+      throw new Error(`EDINET document fetch returned non-ZIP response (${docContentType}) — WAF block likely`);
     }
     
     // ZIPファイルを展開してHTMLテキストを抽出
