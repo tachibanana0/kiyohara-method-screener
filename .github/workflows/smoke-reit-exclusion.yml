@@ -1,0 +1,28 @@
+name: Smoke REIT exclusion
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+      - name: Count exclusion matches on real master
+        env:
+          JQUANTS_API_KEY: ${{ secrets.JQUANTS_API_KEY }}
+        run: npx tsx -e "
+const key = process.env.JQUANTS_API_KEY;
+const res = await fetch('https://api.jquants.com/v2/equities/master', { headers: { 'Content-Type': 'application/json', 'x-api-key': key } });
+const json = await res.json();
+const symbols = json.data || [];
+const patterns = [/投資法人/, /投資信託/, /リート/, /ＲＥＩＴ/, /REIT/i, /ファンド/, /ＥＴＦ/, /ETF/i, /ＥＴＮ/, /ETN/i, /インベストション[・・]?株式会社/];
+const hit = symbols.filter((s) => patterns.some((re) => re.test(s.CoName || '')));
+console.log('total:', symbols.length, 'excluded by name:', hit.length);
+console.log('sample excluded:', hit.slice(0, 12).map((s) => s.CoName));
+"
