@@ -45,9 +45,10 @@ export class EdinetClient {
     }
 
     // EDINET APIはdateパラメータのみ対応（dateFrom/dateToは非対応）
-    // 過去60日分を遡って有価証券報告書を探す
+    // 過去30日分を遡って有価証券報告書を探す
+    // (Workers Free の 1 リクエスト 50 subrequest 上限。他API呼び出しと合算のため30で抑える)
     const docs: EdinetDocument[] = [];
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 30; i++) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().slice(0, 10);
@@ -98,7 +99,7 @@ export class EdinetClient {
       }
 
       // レートリミット対策: 各リクエスト間に少し間隔を空ける
-      if (i < 89) await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 100));
     }
 
     // 最新の1件のみ
