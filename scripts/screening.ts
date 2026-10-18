@@ -664,10 +664,14 @@ function computeQuantScore(marketCap: number, realPER: number, ncRatio: number, 
         continue;
       }
 
-      // 実質PER — 本の基準に従い、ネットキャッシュ比率が使えるならそちらも考慮
-      const netCashFromBS = yf.net_cash > 0 ? yf.net_cash / 1e8 : 0;
+      // ネットキャッシュ: yfinanceの貸借対照表計算を正とする（負の値も含む）。
+      // かつては負のときJ-Quants CashEqにフォールバックしていたが、これが
+      // 「ネットキャッシュ<0（借金超過）」を「CashEq>0」で覆い隠し、ハード基準
+      // (netCash>0)をすり抜ける事故を起こした（208/1409 pickが汚染）。
+      // BSデータが無いときのみCashEq近似を使う。
+      const hasBsData = typeof yf.net_cash === 'number' && yf.net_cash !== 0;
+      const netCash = hasBsData ? yf.net_cash / 1e8 : (latest.CashEq || 0) / 1e8;
       const netCashRatioFromBS = yf.net_cash_ratio || 0;
-      const netCash = netCashFromBS > 0 ? netCashFromBS : ((latest.CashEq || 0) / 1e8);
       const realPER = profit > 0 ? (marketCap - netCash) / (profit / 1e8) : 0;
 
       // 清原スコア計算（閾値制 → スコア制に変更。本に一律閾値なし）
