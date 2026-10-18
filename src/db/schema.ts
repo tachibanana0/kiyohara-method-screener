@@ -215,6 +215,30 @@ export class ScreenerDB {
 
   // --- helpers ---
 
+  /** 各銘柄の最新 cumulative_alpha を一括取得 (1 クエリ)。トラッキング受信時に
+   *  逐次 getTrackingSeries を呼ぶと Workers の subrequest 上限 (50) を超えるため。 */
+  async getLatestCumulativeAlphas(codes: string[]): Promise<Map<string, number>> {
+    const map = new Map<string, number>();
+    if (codes.length === 0) return map;
+    const unique = [...new Set(codes)];
+    const BATCH = 90; // IN句のパラメータ数は 1 クエリあたり 100 バインド上限に余裕を持たせる
+    for (let i = 0; i < unique.length; i += BATCH) {
+      const slice = unique.slice(i, i + BATCH);
+      const placeholders = slice.map(() => '?').join(',');
+      const { results } = await this.db
+        .prepare(
+          `SELECT t.code, t.cumulative_alpha
+           FROM daily_tracking t
+           JOIN (SELECT code, MAX(date) AS max_date FROM daily_tracking WHERE code IN (${placeholders}) GROUP BY code) m
+             ON t.code = m.code AND t.date = m.max_date`
+        )
+        .bind(...slice)
+        .all<{ code: string; cumulative_alpha: number }>();
+      for (const r of results ?? []) map.set(r.code, r.cumulative_alpha);
+    }
+    return map;
+  }
+
   async batchInsertTracking(rows: Omit<DailyTrackingRow, 'id' | 'created_at'>[]): Promise<void> {
     if (rows.length === 0) return;
     const stmts = rows.map((r) =>

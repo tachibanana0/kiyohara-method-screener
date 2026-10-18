@@ -264,13 +264,16 @@ app.post('/api/tracking/receive', async (c) => {
   const db = new ScreenerDB(c.env.DB);
 
   // cumulative_alpha は既存系列の最終値に当日 alpha を加算して計算する。
-  // スクリプト側の単日値 (== alpha) をそのまま保存すると、フェンスポストで
-  // チャートの累積Alphaが毎日リセットされてしまう。
+  // 逐次 getTrackingSeries を呼ぶと Workers Free の subrequest 上限 (50) を超えるため
+  // 最新累積値を一括取得する。
+  const codes = body.rows
+    .filter((row: { code?: unknown; price?: unknown }) => typeof row?.code === 'string' && typeof row?.price === 'number')
+    .map((row: { code: string }) => row.code);
+  const prevCumulative = await db.getLatestCumulativeAlphas(codes);
+
   const trackingRows: Parameters<typeof db.batchInsertTracking>[0] = [];
   for (const row of body.rows) {
     if (typeof row?.code !== 'string' || typeof row?.price !== 'number') continue;
-    const series = await db.getTrackingSeries(row.code);
-    const prevCumulative = series.length > 0 ? series[series.length - 1].cumulative_alpha : 0;
     const alpha = typeof row.alpha === 'number' ? row.alpha : 0;
     trackingRows.push({
       code: row.code,
@@ -278,7 +281,7 @@ app.post('/api/tracking/receive', async (c) => {
       price: row.price,
       topix: typeof row.topix === 'number' ? row.topix : 0,
       alpha,
-      cumulative_alpha: prevCumulative + alpha,
+      cumulative_alpha: (prevCumulative.get(row.code) ?? 0) + alpha,
     });
   }
 
@@ -483,9 +486,9 @@ app.get('/method', (c) => c.html(methodHtml));
 app.get('/faq', (c) => c.html(faqHtml));
 app.get('/about', (c) => c.html(aboutHtml));
 
-const methodHtml = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>清原メソッドとは | 清原メソッド・スクリーナー</title><meta name="description" content="清原メソッドの全7基準（時価総額・実質PER・ネットキャッシュ・成長率・オーナー企業・経営スコア）と自動化の仕組みを詳しく解説します。"><link rel="canonical" href="https://kiyohara-screener.hikakunavi360.com/method"></head><body style="font-family:system-ui,sans-serif;max-width:720px;margin:0 auto;padding:2rem;color:#1e293b;background:#f8fafc"><h1>清原メソッドとは</h1><p>清原メソッドは、伝説の投資家・清原達郎氏が著書『わが投資術 市場は誰に微笑むか』で体系化した日本株投資手法です。割安で成長性のある小型株のうち、創業家が経営に関与するオーナー企業に着目し、長期的な超過収益を狙います。</p><h2>7 つのスクリーニング基準</h2><ol><li><strong>時価総額 &lt; 2,000 億円</strong> — 小型株は成長余地が大きく市場の非効率性による割安銘柄が存在</li><li><strong>実質PER</strong> — 時価総額からネットキャッシュを差し引いた実質的な企業価値÷純利益で割安度を評価</li><li><strong>ネットキャッシュ &gt; 0</strong> — 有利子負債より現金が多く財務健全</li><li><strong>売上高成長率 &gt; 0</strong> — 過去3年平均で売上が成長</li><li><strong>営業利益成長率 &gt; 0</strong> — 利益も成長</li><li><strong>オーナー企業</strong> — 創業者/創業家が現在も経営に関与し大株主</li><li><strong>経営スコア 50点以上</strong> — EDINET 有報を AI が解析し経営品質を評価</li></ol><h2>自動化の仕組み</h2><p>データ収集→定量スクリーニング→AI定性評価→2-Tier選定→Alphaトラッキングの5ステップを平日15:00に自動実行。</p><p><a href="/">← 戻る</a></p></body></html>`;
+const methodHtml = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>清原メソッドとは | 清原メソッド・スクリーナー</title><meta name="description" content="清原メソッドの全7基準（時価総額・実質PER・ネットキャッシュ・成長率・オーナー企業・経営スコア）と自動化の仕組みを詳しく解説します。"><link rel="canonical" href="https://kiyohara-screener.hikakunavi360.com/method"></head><body style="font-family:system-ui,sans-serif;max-width:720px;margin:0 auto;padding:2rem;color:#1e293b;background:#f8fafc"><h1>清原メソッドとは</h1><p>清原メソッドは、伝説の投資家・清原達郎氏が著書『わが投資術 市場は誰に微笑むか』で体系化した日本株投資手法です。割安で成長性のある小型株のうち、創業家が経営に関与するオーナー企業に着目し、長期的な超過収益を狙います。</p><h2>7 つのスクリーニング基準</h2><ol><li><strong>時価総額 &lt; 270 億円</strong> — 小型株は成長余地が大きく市場の非効率性による割安銘柄が存在</li><li><strong>実質PER</strong> — 時価総額からネットキャッシュを差し引いた実質的な企業価値÷純利益で割安度を評価</li><li><strong>ネットキャッシュ &gt; 0</strong> — 有利子負債より現金が多く財務健全</li><li><strong>売上高成長率 &gt; 0</strong> — 過去3年平均で売上が成長</li><li><strong>営業利益成長率 &gt; 0</strong> — 利益も成長</li><li><strong>オーナー企業</strong> — 創業者/創業家が現在も経営に関与し大株主</li><li><strong>経営スコア 50点以上</strong> — EDINET 有報を AI が解析し経営品質を評価</li></ol><h2>自動化の仕組み</h2><p>データ収集→定量スクリーニング→AI定性評価→2-Tier選定→Alphaトラッキングの5ステップを平日15:00に自動実行。</p><p><a href="/">← 戻る</a></p></body></html>`;
 
-const faqHtml = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>よくある質問 | 清原メソッド・スクリーナー</title><meta name="description" content="清原メソッド・スクリーナーのよくある質問（無料ですか？AI判定の精度は？データ更新頻度は？など）"><link rel="canonical" href="https://kiyohara-screener.hikakunavi360.com/faq"></head><body style="font-family:system-ui,sans-serif;max-width:720px;margin:0 auto;padding:2rem;color:#1e293b;background:#f8fafc"><h1>よくある質問</h1><h2>Q: 無料ですか？</h2><p>はい、完全無料です。</p><h2>Q: なぜ東証グロースだけ？</h2><p>清原メソッドの対象である小型株が集中しているため。</p><h2>Q: AIの判定精度は？</h2><p>EDINET有報の大株主構成・役員経歴に基づきGemini 2.5 Flashが判定。250銘柄中7件を正しく検出。</p><h2>Q: データ更新頻度は？</h2><p>平日15:00に自動スクリーニング。株価は毎日15:00に取得。</p><h2>Q: ソースコードは？</h2><p>GitHubで公開中: github.com/tachibanana0/kiyohara-method-screener</p><p><a href="/">← 戻る</a></p></body></html>`;
+const faqHtml = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>よくある質問 | 清原メソッド・スクリーナー</title><meta name="description" content="清原メソッド・スクリーナーのよくある質問（無料ですか？AI判定の精度は？データ更新頻度は？など）"><link rel="canonical" href="https://kiyohara-screener.hikakunavi360.com/faq"></head><body style="font-family:system-ui,sans-serif;max-width:720px;margin:0 auto;padding:2rem;color:#1e293b;background:#f8fafc"><h1>よくある質問</h1><h2>Q: 無料ですか？</h2><p>はい、完全無料です。</p><h2>Q: なぜ東証グロースだけ？</h2><p>現在はPrime/Standard/Growth/JASDAQ全市場（約3,100社）を走査。清原メソッドのハード基準（時価総額270億円以下）でフィルタリングされるため、実質的に小型株が対象です。</p><h2>Q: AIの判定精度は？</h2><p>EDINET有報の大株主構成・役員経歴に基づきGemini 2.5 Flashが判定。持株比率の具体的記述がない銘柄はオーナー企業と判定しません。</p><h2>Q: データ更新頻度は？</h2><p>3時間毎にバッチで全銘柄を走査。株価は毎日15:00に取得。</p><h2>Q: ソースコードは？</h2><p>GitHubで公開中: github.com/tachibanana0/kiyohara-method-screener</p><p><a href="/">← 戻る</a></p></body></html>`;
 
 const aboutHtml = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>運営者情報 | 清原メソッド・スクリーナー</title><meta name="description" content="清原メソッド・スクリーナーの運営者情報・免責事項・技術スタック。Cloudflare Workers + D1 + GitHub Actions + OpenRouter。"><link rel="canonical" href="https://kiyohara-screener.hikakunavi360.com/about"></head><body style="font-family:system-ui,sans-serif;max-width:720px;margin:0 auto;padding:2rem;color:#1e293b;background:#f8fafc"><h1>運営者情報</h1><p>清原メソッド・スクリーナーは清原達郎氏の投資手法に基づく自動スクリーニングツールです。</p><h2>技術スタック</h2><p>Cloudflare Workers (Hono v4) / D1 (SQLite) / Pages / React 19 + Vite + Tailwind v4 / GitHub Actions / J-Quants API v2 / EDINET API v2 / Yahoo Finance / OpenRouter (Gemini 2.5 Flash)</p><h2>免責事項</h2><p>本サービスは投資助言を目的としたものではありません。実際の投資判断はご自身の責任で行ってください。清原達郎氏および関係者とは一切関係ありません。</p><p><a href="/">← 戻る</a></p></body></html>`;
 

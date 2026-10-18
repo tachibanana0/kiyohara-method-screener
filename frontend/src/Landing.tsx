@@ -65,7 +65,7 @@ export default function Landing() {
     <div className="min-h-screen bg-[#080c14] text-white overflow-x-hidden">
       <Head>
         <title>【完全無料】清原メソッド・スクリーナー | AIが割安小型成長株を毎日自動選定</title>
-        <meta name="description" content="東証グロース全250銘柄を毎日AIがスクリーニング。時価総額2,000億円以下・実質PER・ネットキャッシュ・成長率から割安小型成長株を発掘し、オーナー企業を判定。選定後は超過収益Alphaをトラッキング。清原達郎「わが投資術」の実践を完全自動化。" />
+        <meta name="description" content="東証上場全銘柄（Prime/Standard/Growth/JASDAQ 約3,100社）を毎日AIがスクリーニング。時価総額270億円以下・実質PER・ネットキャッシュ・成長率から割安小型成長株を発掘し、オーナー企業を判定。選定後は超過収益Alphaをトラッキング。清原達郎「わが投資術」の実践を完全自動化。" />
       </Head>
       {/* Hero */}
       <section className="relative min-h-screen flex items-center justify-center px-6 py-24">
@@ -317,7 +317,7 @@ export default function Landing() {
           <div className="space-y-6 text-sm">
             {[
               { q: '清原メソッド・スクリーナーは無料ですか？', a: 'はい、完全無料です。Cloudflare / GitHub の無料枠で運用しています。' },
-              { q: 'なぜ東証グロース市場だけが対象ですか？', a: '清原メソッドが本来対象とする小型株が東証グロースに集中しているためです。' },
+              { q: 'なぜ東証グロース市場だけが対象ですか？', a: '現在は Prime/Standard/Growth/JASDAQ 全市場（約3,100社）を走査しています。清原メソッドのハード基準（時価総額270億円以下）でフィルタリングされるため、実質的に小型株が対象です。' },
               { q: 'AI の判定精度は？', a: 'EDINET 有報の大株主構成・役員経歴に基づき Gemini 2.5 Flash が判定。検証では 250 銘柄中 7 件を正しく検出しました。ただし最終投資判断はご自身で。' },
             ].map((f, i) => (
               <div key={i}>
@@ -342,7 +342,7 @@ export default function Landing() {
             清原メソッドを、<span className="text-amber-400">自動化</span>しよう
           </h2>
           <p className="text-gray-400 mb-10 text-sm leading-relaxed">
-            毎日 250 銘柄をチェックする手間から解放されます。
+            毎日 約3,100 銘柄をチェックする手間から解放されます。
             平日 15 時に自動スクリーニング、選定後は Alpha を毎日トラッキング。
             あなたは結果を見るだけ。
           </p>

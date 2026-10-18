@@ -113,7 +113,7 @@ export default function Dashboard() {
               <Link to="/" className="text-xs text-gray-500 hover:text-gray-300 transition-colors">← LP</Link>
               <h1 className="text-lg font-bold tracking-tight leading-tight">清原メソッド・スクリーナー</h1>
             </div>
-            <p className="text-xs text-gray-400 mt-0.5 ml-11">東証グロース市場の割安小型成長株を自動選定 &amp; Alphaトラッキング</p>
+            <p className="text-xs text-gray-400 mt-0.5 ml-11">東証全市場の割安小型成長株を自動選定 &amp; Alphaトラッキング</p>
           </div>
         </div>
       </header>
@@ -131,7 +131,7 @@ export default function Dashboard() {
                 <div className="p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-y-4 gap-x-6 text-sm">
                   <div>
                     <div className="text-[10px] uppercase tracking-widest text-muted mb-1.5">対象市場</div>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">東証グロース (TSE Growth)</span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700">東証全市場 (Prime/Standard/Growth/JASDAQ)</span>
                     <p className="text-xs text-muted/60 mt-1">J-Quants API より取得</p>
                   </div>
                   <div>
