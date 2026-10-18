@@ -4,8 +4,9 @@
 // ============================================
 
 import type { JQuantsSymbol, JQuantsStatement, QuantScreenedStock } from '../types';
-import { YahooFinanceClient } from './yahoo-finance';
+import type { ScreenerDB } from '../db/schema';
 import { EdinetClient } from './edinet';
+import { YahooFinanceClient } from './yahoo-finance';
 
 const RATE_LIMIT_MS = 5_000; // Free tier: 3 req/min = 20s interval, but use 5s for speed
 
@@ -88,7 +89,7 @@ export class JQuantsClient {
    *  - 株価: Yahoo Finance API
    *  - 財務: J-Quants API (Free tier: 5req/min) → 403時はEDINETフォールバック
    */
-  async screenQuantitatively(edinetClient?: EdinetClient, db?: import('../db/schema').ScreenerDB): Promise<QuantScreenedStock[]> {
+  async screenQuantitatively(edinetClient?: EdinetClient, db?: ScreenerDB): Promise<QuantScreenedStock[]> {
     console.log('screenQuantitatively: START');
     const yahoo = new YahooFinanceClient();
 
