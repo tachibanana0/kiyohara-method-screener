@@ -155,7 +155,7 @@ export class ScreenerDB {
            AND (
              market_cap > ?1
              OR real_per <= 0 OR real_per > ?2
-             OR net_cash <= 0
+             OR net_cash <= 0 OR net_cash_ratio <= 0
              OR name LIKE '%投資法人%' OR name LIKE '%投資信託%' OR name LIKE '%リート%'
              OR name LIKE '%ＲＥＩＴ%' OR name LIKE '%REIT%' OR name LIKE '%ファンド%'
              OR name LIKE '%ＥＴＦ%' OR name LIKE '%ETF%' OR name LIKE '%ＥＴＮ%' OR name LIKE '%ETN%'
@@ -174,7 +174,7 @@ export class ScreenerDB {
            AND (
              market_cap > ?1
              OR real_per <= 0 OR real_per > ?2
-             OR net_cash <= 0
+             OR net_cash <= 0 OR net_cash_ratio <= 0
              OR name LIKE '%投資法人%' OR name LIKE '%投資信託%' OR name LIKE '%リート%'
              OR name LIKE '%ＲＥＩＴ%' OR name LIKE '%REIT%' OR name LIKE '%ファンド%'
              OR name LIKE '%ＥＴＦ%' OR name LIKE '%ETF%' OR name LIKE '%ＥＴＮ%' OR name LIKE '%ETN%'
