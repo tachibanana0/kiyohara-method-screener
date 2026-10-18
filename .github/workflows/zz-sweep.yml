@@ -14,3 +14,4 @@ jobs:
             -H "Content-Type: application/json" \
             -H "X-Screening-Token: $SCREENING_API_TOKEN" \
             -d '{"dryRun": true}'
+          echo ""
