@@ -143,24 +143,38 @@ async function main() {
   console.log(`Step 3 complete: ${trackingRows.length} rows to save`);
 
   console.log('Step 4: Save to Worker...');
-  const res = await fetch(`${screeningApiUrl}/api/tracking/receive`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Screening-Token': screeningApiToken,
-    },
-    body: JSON.stringify({
-      date: new Date().toISOString().slice(0, 10),
-      rows: trackingRows,
-    }),
-  });
 
-  if (!res.ok) {
-    throw new Error(`Worker API error: ${res.status}`);
+  // 大きな POST は GH ランナーの egress で EPIPE が発生することがあるため、
+  // 500 行ずつ分割して送り、失敗時は指数バックオフで 3 回リトライする。
+  const CHUNK = 500;
+  for (let i = 0; i < trackingRows.length; i += CHUNK) {
+    const chunk = trackingRows.slice(i, i + CHUNK);
+    let res: Response | undefined;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        res = await fetch(`${screeningApiUrl}/api/tracking/receive`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Screening-Token': screeningApiToken,
+          },
+          body: JSON.stringify({
+            date: new Date().toISOString().slice(0, 10),
+            rows: chunk,
+          }),
+        });
+        break;
+      } catch (err: unknown) {
+        console.warn(`Worker POST failed (attempt ${attempt + 1}/3):`, err instanceof Error ? err.message : err);
+        await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+      }
+    }
+    if (!res || !res.ok) {
+      throw new Error(`Worker API error: ${res?.status ?? 'no response'}`);
+    }
+    const result = await res.json() as { success: boolean; saved: number };
+    console.log(`Worker response: ${result.saved} rows saved (chunk ${i / CHUNK + 1})`);
   }
-
-  const result = await res.json() as { success: boolean; saved: number };
-  console.log(`Worker response: ${result.saved} rows saved`);
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   console.log(`=== Alpha Tracking Complete: ${elapsed}s ===`);
