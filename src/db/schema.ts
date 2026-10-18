@@ -199,6 +199,13 @@ export class ScreenerDB {
     return row ?? null;
   }
 
+  async getAllEdinetMappings(): Promise<Array<{ code: string; edinet_code: string; company_name: string }>> {
+    const { results } = await this.db
+      .prepare(`SELECT code, edinet_code, company_name FROM edinet_mappings`)
+      .all<{ code: string; edinet_code: string; company_name: string }>();
+    return results ?? [];
+  }
+
   async upsertEdinetMapping(code: string, edinetCode: string, companyName: string): Promise<void> {
     await this.db
       .prepare(

@@ -518,6 +518,31 @@ ${relevantText}`;
 }
 
 // ============================================
+// edinet_mappings (Worker API経由)
+// ============================================
+
+async function fetchEdinetMappings(): Promise<Map<string, string>> {
+  const apiUrl = process.env.SCREENING_API_URL;
+  const token = process.env.SCREENING_API_TOKEN;
+  const map = new Map<string, string>();
+  if (!apiUrl || !token) return map;
+  try {
+    const res = await fetch(`${apiUrl}/api/edinet-mappings`, {
+      headers: { 'X-Screening-Token': token },
+    });
+    if (!res.ok) return map;
+    const data: unknown = await res.json();
+    if (data === null || typeof data !== 'object' || !('mappings' in data)) return map;
+    const rows = (data as { mappings: Array<{ code: string; edinet_code: string }> }).mappings;
+    for (const r of rows) map.set(r.code, r.edinet_code);
+    console.log(`edinet_mappings: ${map.size} codes loaded`);
+  } catch {
+    console.warn('edinet_mappings fetch failed — running without mappings');
+  }
+  return map;
+}
+
+// ============================================
 // LLM評価キャッシュ (Worker API経由, docID単位)
 // ============================================
 
@@ -625,8 +650,9 @@ async function runScreening(): Promise<PickResult[]> {
   });
   console.log(`Target: ${targetSymbols.length} stocks (${TARGET_MARKETS.join(',')})`);
 
-  // edinetCode map — dynamically built from EDINET API search results
-  const edinetCodeMap = new Map<string, string>();
+  // edinetCode マッピング — Worker D1 の edinet_mappings テーブルから取得
+  // (build-edinet-mappings.ts が EDINET 日次一覧から secCode→edinetCode ペアを蓄積)
+  const edinetCodeMap = await fetchEdinetMappings();
 
   // バッチ処理: ALL_MARKETS有効時はカバレッジが広いためバッチ数を増やす
   const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '50', 10);

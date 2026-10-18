@@ -300,6 +300,45 @@ app.post('/api/evaluations', async (c) => {
   return c.json({ success: true, saved });
 });
 
+// --- API: edinet_mappings 一括取得/保存 (build-edinet-mappings.ts 用) ---
+app.get('/api/edinet-mappings', async (c) => {
+  const token = c.req.header('X-Screening-Token');
+  if (!token || token !== c.env.SCREENING_API_TOKEN) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+  const db = new ScreenerDB(c.env.DB);
+  const mappings = await db.getAllEdinetMappings();
+  return c.json({ mappings });
+});
+
+app.post('/api/edinet-mappings/receive', async (c) => {
+  const token = c.req.header('X-Screening-Token');
+  if (!token || token !== c.env.SCREENING_API_TOKEN) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+  const body = await c.req.json().catch(() => null);
+  if (
+    !body || !Array.isArray(body.mappings) ||
+    !body.mappings.every((m: { code?: unknown; edinetCode?: unknown; companyName?: unknown }) =>
+      typeof m?.code === 'string' &&
+      typeof m?.edinetCode === 'string' &&
+      typeof m?.companyName === 'string')
+  ) {
+    return c.json({ error: 'Invalid request body' }, 400);
+  }
+  const db = new ScreenerDB(c.env.DB);
+  let saved = 0;
+  for (const m of body.mappings) {
+    try {
+      await db.upsertEdinetMapping(m.code, m.edinetCode, m.companyName);
+      saved++;
+    } catch (err) {
+      console.error(`Failed to save mapping ${m.code}:`, err);
+    }
+  }
+  return c.json({ success: true, saved });
+});
+
 // --- API: GitHub Actionsからのトラッキング結果受信 ---
 app.post('/api/tracking/receive', async (c) => {
   const token = c.req.header('X-Screening-Token');
