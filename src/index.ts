@@ -248,6 +248,58 @@ app.post('/api/screening/receive', async (c) => {
   });
 });
 
+// --- API: LLM評価キャッシュ (screening.ts が docID 単位で参照/保存) ---
+app.get('/api/evaluations/:code', async (c) => {
+  const token = c.req.header('X-Screening-Token');
+  if (!token || token !== c.env.SCREENING_API_TOKEN) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+  const code = c.req.param('code');
+  const docId = c.req.query('docId');
+  const db = new ScreenerDB(c.env.DB);
+  const row = docId
+    ? await db.getEvaluationByDocId(code, docId)
+    : await db.getLatestEvaluation(code);
+  return c.json({ evaluation: row });
+});
+
+app.post('/api/evaluations', async (c) => {
+  const token = c.req.header('X-Screening-Token');
+  if (!token || token !== c.env.SCREENING_API_TOKEN) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+  const body = await c.req.json().catch(() => null);
+  if (
+    !body || !Array.isArray(body.evaluations) ||
+    !body.evaluations.every((e: { code?: unknown; docId?: unknown; isOwnerCompany?: unknown; managementScore?: unknown; reason?: unknown }) =>
+      typeof e?.code === 'string' &&
+      typeof e?.docId === 'string' &&
+      typeof e?.isOwnerCompany === 'boolean' &&
+      typeof e?.managementScore === 'number' &&
+      typeof e?.reason === 'string')
+  ) {
+    return c.json({ error: 'Invalid request body' }, 400);
+  }
+  const db = new ScreenerDB(c.env.DB);
+  let saved = 0;
+  for (const e of body.evaluations) {
+    try {
+      await db.insertEvaluation(
+        e.code,
+        e.docId,
+        e.submittedDate ?? new Date().toISOString().slice(0, 10),
+        e.isOwnerCompany,
+        e.managementScore,
+        e.reason
+      );
+      saved++;
+    } catch (err) {
+      console.error(`Failed to save evaluation ${e.code}:`, err);
+    }
+  }
+  return c.json({ success: true, saved });
+});
+
 // --- API: GitHub Actionsからのトラッキング結果受信 ---
 app.post('/api/tracking/receive', async (c) => {
   const token = c.req.header('X-Screening-Token');

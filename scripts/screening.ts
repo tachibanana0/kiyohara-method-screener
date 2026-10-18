@@ -518,6 +518,69 @@ ${relevantText}`;
 }
 
 // ============================================
+// LLM評価キャッシュ (Worker API経由, docID単位)
+// ============================================
+
+interface CachedEvaluationRow {
+  code: string;
+  doc_id: string;
+  is_owner_company: number;
+  management_score: number;
+  reason: string;
+}
+
+async function fetchEvaluationCache(code: string, docId: string): Promise<LlmEvaluation | null> {
+  const apiUrl = process.env.SCREENING_API_URL;
+  const token = process.env.SCREENING_API_TOKEN;
+  if (!apiUrl || !token) return null;
+  try {
+    const res = await fetch(`${apiUrl}/api/evaluations/${code}?docId=${encodeURIComponent(docId)}`, {
+      headers: { 'X-Screening-Token': token },
+    });
+    if (!res.ok) return null;
+    const data: unknown = await res.json();
+    if (data === null || typeof data !== 'object' || !('evaluation' in data)) return null;
+    const row = (data as { evaluation: CachedEvaluationRow | null }).evaluation;
+    if (!row) return null;
+    return {
+      is_owner_company: row.is_owner_company,
+      management_score: row.management_score,
+      reason: row.reason,
+    };
+  } catch {
+    // キャッシュ不達はLLM再評価でフォールバック（致命ではない）
+    return null;
+  }
+}
+
+async function saveEvaluationCache(code: string, docId: string, evaluation: LlmEvaluation): Promise<void> {
+  const apiUrl = process.env.SCREENING_API_URL;
+  const token = process.env.SCREENING_API_TOKEN;
+  if (!apiUrl || !token) return;
+  try {
+    await fetch(`${apiUrl}/api/evaluations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Screening-Token': token,
+      },
+      body: JSON.stringify({
+        evaluations: [{
+          code,
+          docId,
+          submittedDate: new Date().toISOString().slice(0, 10),
+          isOwnerCompany: evaluation.is_owner_company === 1,
+          managementScore: evaluation.management_score,
+          reason: evaluation.reason,
+        }],
+      }),
+    });
+  } catch {
+    // 保存失敗も致命ではない（次回再評価されるだけ）
+  }
+}
+
+// ============================================
 // スクリーニングロジック
 // ============================================
 
@@ -751,11 +814,21 @@ function computeQuantScore(marketCap: number, realPER: number, ncRatio: number, 
       // Skip correction reports (訂正報告書) — don't contain management info
       const primaryReport = reports.find((r) => !r.docDescription?.includes('訂正')) || reports[0];
 
-      const docText = await edinet.fetchDocumentText(primaryReport.docID);
-      const evalResult = await openrouter.evaluateCompany(docText);
+      // 評価キャッシュ: 同一docIDの評価は再実行しない（LLMコスト・評価揺らぎ防止）
+      const cached = await fetchEvaluationCache(stock.code, primaryReport.docID);
+      let evalResult: LlmEvaluation;
+      let usedCache = false;
+      if (cached) {
+        evalResult = cached;
+        usedCache = true;
+      } else {
+        const docText = await edinet.fetchDocumentText(primaryReport.docID);
+        evalResult = await openrouter.evaluateCompany(docText);
+        await saveEvaluationCache(stock.code, primaryReport.docID, evalResult);
+      }
       evaluated.push({ stock, eval: evalResult });
-      console.log(`Evaluated ${stock.code}: owner=${evalResult.is_owner_company}, score=${evalResult.management_score}`);
-      
+      console.log(`Evaluated ${stock.code}: owner=${evalResult.is_owner_company}, score=${evalResult.management_score}${usedCache ? ' (cached)' : ''}`);
+
       await sleep(500);
     } catch (err) {
       console.warn(`LLM evaluation failed for ${stock.code}:`, err);
