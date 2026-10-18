@@ -144,6 +144,47 @@ export class ScreenerDB {
       .run();
   }
 
+  /** 現行ハード基準に違反する active picks を一括クローズ。
+   *  旧ロジックで選定された汚染行 (大型株・PER基準外・NC<=0) を掃除する。
+   *  REIT/投資法人等の名前パターンは screening 側の除外リストと同一正規表現。 */
+  async closeNonCompliantPicks(maxMarketCap: number, maxRealPer: number): Promise<number> {
+    const result = await this.db
+      .prepare(
+        `UPDATE picks SET status = 'closed'
+         WHERE status = 'active'
+           AND (
+             market_cap > ?1
+             OR real_per <= 0 OR real_per > ?2
+             OR net_cash <= 0
+             OR name LIKE '%投資法人%' OR name LIKE '%投資信託%' OR name LIKE '%リート%'
+             OR name LIKE '%ＲＥＩＴ%' OR name LIKE '%REIT%' OR name LIKE '%ファンド%'
+             OR name LIKE '%ＥＴＦ%' OR name LIKE '%ETF%' OR name LIKE '%ＥＴＮ%' OR name LIKE '%ETN%'
+           )`
+      )
+      .bind(maxMarketCap, maxRealPer)
+      .run();
+    return result.meta.changes ?? 0;
+  }
+
+  async countNonCompliantPicks(maxMarketCap: number, maxRealPer: number): Promise<number> {
+    const row = await this.db
+      .prepare(
+        `SELECT COUNT(*) as n FROM picks
+         WHERE status = 'active'
+           AND (
+             market_cap > ?1
+             OR real_per <= 0 OR real_per > ?2
+             OR net_cash <= 0
+             OR name LIKE '%投資法人%' OR name LIKE '%投資信託%' OR name LIKE '%リート%'
+             OR name LIKE '%ＲＥＩＴ%' OR name LIKE '%REIT%' OR name LIKE '%ファンド%'
+             OR name LIKE '%ＥＴＦ%' OR name LIKE '%ETF%' OR name LIKE '%ＥＴＮ%' OR name LIKE '%ETN%'
+           )`
+      )
+      .bind(maxMarketCap, maxRealPer)
+      .first<{ n: number }>();
+    return row?.n ?? 0;
+  }
+
   // --- daily_tracking ---
 
   async getLatestTracking(code: string): Promise<DailyTrackingRow | null> {

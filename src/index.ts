@@ -114,6 +114,29 @@ app.get('/api/picks', async (c) => {
   return c.json(picks);
 });
 
+// --- API: 汚染picks一括クローズ (手動メンテナンス用, token必須) ---
+// 旧ロジックで選定された現行ハード基準違反の active picks を closed にする。
+// dryRun=true なら件数のみ返して変更しない。
+app.post('/api/picks/sweep', async (c) => {
+  const token = c.req.header('X-Screening-Token');
+  if (!token || token !== c.env.SCREENING_API_TOKEN) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+  const body = await c.req.json().catch(() => ({}));
+  const dryRun = body?.dryRun === true;
+  const maxMarketCap = typeof body?.maxMarketCap === 'number' ? body.maxMarketCap : 270;
+  const maxRealPer = typeof body?.maxRealPer === 'number' ? body.maxRealPer : 25;
+
+  const db = new ScreenerDB(c.env.DB);
+  if (dryRun) {
+    const wouldClose = await db.countNonCompliantPicks(maxMarketCap, maxRealPer);
+    return c.json({ dryRun: true, wouldClose });
+  }
+
+  const closed = await db.closeNonCompliantPicks(maxMarketCap, maxRealPer);
+  return c.json({ success: true, closed });
+});
+
 // --- API: 特定銘柄のトラッキング系列 ---
 app.get('/api/tracking/:code', async (c) => {
   const code = c.req.param('code');
